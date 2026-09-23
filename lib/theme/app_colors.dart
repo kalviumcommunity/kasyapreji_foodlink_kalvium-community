@@ -77,6 +77,14 @@ class AppColors {
     1.0,
   ];
 
+  // Forms
+  static const Color fieldBorder = Color(0xFFE2E6E0);
+  static const Color fieldIcon = Color(0xFF7C857F);
+  static const Color fieldHint = Color(0xFF9AA19C);
+  static const Color socialFill = Color(0xFFECEEEA);
+  static const Color error = Color(0xFFC4453A);
+  static const List<Color> avatar = [Color(0xFFC99C74), Color(0xFF6E4A33)];
+
   // Splash effects
   static const Color glow = Color(0xFFDCEBD5);
   static const Color particle = Color(0xFFF4F9E8);

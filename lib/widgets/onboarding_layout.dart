@@ -54,6 +54,10 @@ class OnboardingArt {
   }
 }
 
+/// How long each onboarding page waits (after its entrance) before moving on
+/// by itself.
+const onboardingAutoAdvance = Duration(seconds: 5);
+
 typedef OnboardingArtBuilder = Widget Function(
   BuildContext context,
   OnboardingArt art,
