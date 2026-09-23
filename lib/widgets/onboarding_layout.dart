@@ -21,6 +21,7 @@ class OnboardingArt {
     required this.reveal,
     required this.leafIn,
     required this.accentIn,
+    this.highlight,
   });
 
   /// Size of the area the artwork fills.
@@ -39,6 +40,18 @@ class OnboardingArt {
   final double reveal;
   final double leafIn;
   final double accentIn;
+
+  /// When the body has highlight words: which one is lit, as a looping
+  /// position (1.5 = midway through the second word). Null otherwise.
+  final double? highlight;
+
+  /// How lit highlight word [index] is right now (0–1), for syncing artwork.
+  double highlightOf(int index) {
+    final h = highlight;
+    if (h == null) return 0;
+    final t = h - index;
+    return t >= 0 && t < 1 ? math.sin(t * math.pi) : 0;
+  }
 }
 
 typedef OnboardingArtBuilder = Widget Function(
@@ -70,6 +83,10 @@ class OnboardingLayout extends StatefulWidget {
     required this.wideArt,
     this.wideArtAspectRatio = 1,
     this.backdrop = SoftBackdropPalette.sage,
+    this.highlightWords = const [],
+    this.showSkip = true,
+    this.compactButtonLight = false,
+    this.autoAdvanceAfter,
     this.onNext,
     this.onSkip,
   });
@@ -94,6 +111,21 @@ class OnboardingLayout extends StatefulWidget {
   final double wideArtAspectRatio;
 
   final SoftBackdropPalette backdrop;
+
+  /// Words in the body that light up in turn (for example action verbs).
+  final List<String> highlightWords;
+
+  /// Hide Skip on the last page, where it would do the same as next.
+  final bool showSkip;
+
+  /// Use the white next button in the phone layout (for dark artwork).
+  final bool compactButtonLight;
+
+  /// If set, moves on by itself this long after the entrance finishes, with
+  /// a ring filling around the next button. Touching the screen restarts the
+  /// countdown, and it only ever fires once per page.
+  final Duration? autoAdvanceAfter;
+
   final VoidCallback? onNext;
   final VoidCallback? onSkip;
 
@@ -109,10 +141,48 @@ class OnboardingLayout extends StatefulWidget {
 
 class _OnboardingLayoutState extends State<OnboardingLayout>
     with TickerProviderStateMixin {
-  late final AnimationController _intro = AnimationController(
+  late final AnimationController _intro =
+      AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 2200),
+        )
+        ..addStatusListener(_onIntroStatus)
+        ..forward();
+
+  /// Auto-advance countdown (only used when [autoAdvanceAfter] is set).
+  late final AnimationController _countdown = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  )..forward();
+    duration: widget.autoAdvanceAfter ?? const Duration(seconds: 1),
+  )..addStatusListener(_onCountdownStatus);
+
+  /// Set once this page has moved on, so returning to it never re-triggers.
+  bool _advanced = false;
+
+  void _onIntroStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed &&
+        widget.autoAdvanceAfter != null) {
+      _countdown.forward(from: 0);
+    }
+  }
+
+  void _onCountdownStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed || _advanced) return;
+    // Only move on while this page is the one on screen.
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    _next();
+  }
+
+  void _restartCountdown() {
+    if (_advanced || !_countdown.isAnimating) return;
+    _countdown.forward(from: 0);
+  }
+
+  void _next() {
+    if (widget.onNext == null) return;
+    _advanced = true;
+    _countdown.stop();
+    widget.onNext!();
+  }
 
   late final AnimationController _ambient = AnimationController(
     vsync: this,
@@ -141,6 +211,7 @@ class _OnboardingLayoutState extends State<OnboardingLayout>
   @override
   void dispose() {
     _intro.dispose();
+    _countdown.dispose();
     _ambient.dispose();
     super.dispose();
   }
@@ -153,7 +224,16 @@ class _OnboardingLayoutState extends State<OnboardingLayout>
     reveal: _art.value,
     leafIn: _leaf.value,
     accentIn: _accent.value,
+    highlight: _highlightPosition,
   );
+
+  /// Looping position through [highlightWords], about 1.6 s per word, once
+  /// the body has appeared.
+  double? get _highlightPosition {
+    final n = widget.highlightWords.length;
+    if (n == 0 || !_intro.isCompleted) return null;
+    return (_ambient.value * 8 / 1.6) % n;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -193,10 +273,20 @@ class _OnboardingLayoutState extends State<OnboardingLayout>
                   ),
                 ),
                 Positioned.fill(
-                  child: AnimatedBuilder(
-                    animation: Listenable.merge([_intro, _ambient]),
-                    builder: (context, _) =>
-                        wide ? _buildWide(size) : _buildCompact(size),
+                  child: Listener(
+                    // Any touch means the reader is engaged: restart the
+                    // auto-advance countdown.
+                    onPointerDown: (_) => _restartCountdown(),
+                    behavior: HitTestBehavior.translucent,
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _intro,
+                        _ambient,
+                        _countdown,
+                      ]),
+                      builder: (context, _) =>
+                          wide ? _buildWide(size) : _buildCompact(size),
+                    ),
                   ),
                 ),
               ],
@@ -240,20 +330,21 @@ class _OnboardingLayoutState extends State<OnboardingLayout>
           child: RiseIn(
             progress: _bodyIn.value,
             distance: 16 * s,
-            child: Text(widget.compactBody, style: _bodyStyle(18 * s, 1.83)),
+            child: _bodyText(widget.compactBody, _bodyStyle(18 * s, 1.83)),
           ),
         ),
         Positioned(
           left: button.dx * sx - buttonOuter / 2,
           top: button.dy * sy - buttonOuter / 2,
-          child: _nextButton(78 * s),
+          child: _nextButton(78 * s, light: widget.compactButtonLight),
         ),
-        Positioned(
-          // Below the status bar / notch.
-          top: MediaQuery.paddingOf(context).top + 14 * s,
-          right: 20 * sx,
-          child: _skipButton(s),
-        ),
+        if (widget.showSkip)
+          Positioned(
+            // Below the status bar / notch.
+            top: MediaQuery.paddingOf(context).top + 14 * s,
+            right: 20 * sx,
+            child: _skipButton(s),
+          ),
       ],
     );
   }
@@ -293,7 +384,8 @@ class _OnboardingLayoutState extends State<OnboardingLayout>
           ),
         ),
         // Lines up with the brand header on the left.
-        Positioned(top: 30 * s, right: 72 * s, child: _skipButton(s)),
+        if (widget.showSkip)
+          Positioned(top: 30 * s, right: 72 * s, child: _skipButton(s)),
         Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 1240 * s),
@@ -318,9 +410,9 @@ class _OnboardingLayoutState extends State<OnboardingLayout>
                           distance: 16 * s,
                           child: ConstrainedBox(
                             constraints: BoxConstraints(maxWidth: 430 * s),
-                            child: Text(
+                            child: _bodyText(
                               widget.wideBody,
-                              style: _bodyStyle(20 * s, 1.7),
+                              _bodyStyle(20 * s, 1.7),
                             ),
                           ),
                         ),
@@ -413,11 +505,48 @@ class _OnboardingLayoutState extends State<OnboardingLayout>
     child: SkipButton(scale: scale, onPressed: widget.onSkip),
   );
 
-  Widget _nextButton(double diameter) => PulseNextButton(
+  /// Body copy; any [OnboardingLayout.highlightWords] glow green in turn.
+  Widget _bodyText(String text, TextStyle style) {
+    final words = widget.highlightWords;
+    if (words.isEmpty) return Text(text, style: style);
+    final pattern = RegExp(words.map(RegExp.escape).join('|'));
+    final spans = <TextSpan>[];
+    var last = 0;
+    for (final match in pattern.allMatches(text)) {
+      spans.add(TextSpan(text: text.substring(last, match.start)));
+      final glow = _artValues(
+        Size.zero,
+        1,
+        1,
+      ).highlightOf(words.indexOf(match.group(0)!));
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: TextStyle(
+            color: Color.lerp(
+              AppColors.ink,
+              AppColors.accentGradient.first,
+              glow,
+            ),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+      last = match.end;
+    }
+    spans.add(TextSpan(text: text.substring(last)));
+    return Text.rich(TextSpan(style: style, children: spans));
+  }
+
+  Widget _nextButton(double diameter, {bool light = false}) => PulseNextButton(
     diameter: diameter,
     time: _ambient.value,
     appear: _button.value,
     showHalo: _intro.isCompleted,
-    onPressed: widget.onNext,
+    light: light,
+    progress: widget.autoAdvanceAfter != null && !_advanced
+        ? _countdown.value
+        : null,
+    onPressed: widget.onNext == null ? null : _next,
   );
 }

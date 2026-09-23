@@ -63,6 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       wideArt: (context, art) => CustomPaint(
         painter: _WideSceneryPainter(art: art, photo: _photo.image),
       ),
+      autoAdvanceAfter: onboardingAutoAdvance,
       onNext: () =>
           Navigator.of(context)
               .push(softRoute(const ImpactScreen(), slide: true)),
@@ -70,6 +71,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 }
+
+/// How long each onboarding page waits (after its entrance) before moving on
+/// by itself.
+const onboardingAutoAdvance = Duration(seconds: 5);
 
 /// The swaying leaf shown beside the headline.
 const _leafShape = LeafShape(
