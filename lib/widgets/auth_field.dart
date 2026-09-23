@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 
@@ -21,6 +22,8 @@ class AuthField extends StatefulWidget {
     this.onSubmitted,
     this.onChanged,
     this.focusNode,
+    this.inputFormatters,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -35,6 +38,8 @@ class AuthField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final ValueChanged<String>? onChanged;
   final FocusNode? focusNode;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextCapitalization textCapitalization;
 
   @override
   State<AuthField> createState() => _AuthFieldState();
@@ -121,6 +126,8 @@ class _AuthFieldState extends State<AuthField> {
                   textInputAction: widget.textInputAction,
                   onSubmitted: widget.onSubmitted,
                   onChanged: widget.onChanged,
+                  inputFormatters: widget.inputFormatters,
+                  textCapitalization: widget.textCapitalization,
                   cursorColor: AppColors.brand,
                   style: TextStyle(
                     fontSize: 16 * s,

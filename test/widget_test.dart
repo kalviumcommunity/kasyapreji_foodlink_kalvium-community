@@ -6,6 +6,8 @@ import 'package:foodlink/screens/change_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
 import 'package:foodlink/screens/onboarding_screen.dart';
 import 'package:foodlink/screens/sign_in_screen.dart';
+import 'package:foodlink/screens/sign_up_screen.dart';
+import 'package:foodlink/widgets/primary_button.dart';
 
 void main() {
   testWidgets('Splash screen shows brand name and taglines', (tester) async {
@@ -99,6 +101,13 @@ void main() {
     expect(find.byType(ImpactScreen), findsNothing);
   });
 
+  /// Scrolls [finder] into view, then taps it.
+  Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.pump();
+    await tester.tap(finder);
+  }
+
   Future<void> settle(WidgetTester tester, [int steps = 20]) async {
     for (var i = 0; i < steps; i++) {
       await tester.pump(const Duration(milliseconds: 100));
@@ -187,5 +196,74 @@ void main() {
     await tester.tap(remember);
     await settle(tester, 3);
     expect(tester.getSemantics(remember), isSemantics(isChecked: false));
+  });
+
+  testWidgets('Sign In and Sign Up links swap between the screens', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
+    await settle(tester);
+
+    await tapVisible(tester, find.bySemanticsLabel('Sign Up'));
+    await settle(tester, 15);
+    expect(find.byType(SignUpScreen), findsOneWidget);
+    expect(find.byType(SignInScreen), findsNothing);
+    expect(find.text('Create Account'), findsWidgets);
+
+    await tapVisible(tester, find.bySemanticsLabel('Sign In'));
+    await settle(tester, 15);
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(find.byType(SignUpScreen), findsNothing);
+  });
+
+  testWidgets('Sign Up validates every field and the terms', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SignUpScreen()));
+    await settle(tester);
+
+    await tapVisible(tester, find.byType(PrimaryButton));
+    await settle(tester, 5);
+    expect(find.text('Please enter your full name'), findsOneWidget);
+    expect(find.text('Please enter your email'), findsOneWidget);
+    expect(find.text('Please enter your phone number'), findsOneWidget);
+    expect(find.text('Please create a password'), findsOneWidget);
+    expect(find.text('Please accept the Terms & Conditions'), findsOneWidget);
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), 'Asha Rao');
+    await tester.enterText(fields.at(1), 'asha@foodlink.org');
+    await tester.enterText(fields.at(2), '12');
+    await tester.enterText(fields.at(3), 'short');
+    await tapVisible(tester, find.byType(PrimaryButton));
+    await settle(tester, 5);
+    expect(find.text("That phone number doesn't look right"), findsOneWidget);
+    expect(find.text('Use at least 8 characters'), findsOneWidget);
+
+    // Ticking the box clears the terms error.
+    final terms = find.bySemanticsLabel('I agree to the Terms & Conditions');
+    expect(tester.getSemantics(terms), isSemantics(isChecked: false));
+    await tapVisible(tester, terms);
+    await settle(tester, 3);
+    expect(tester.getSemantics(terms), isSemantics(isChecked: true));
+    expect(find.text('Please accept the Terms & Conditions'), findsNothing);
+
+    await tester.enterText(fields.at(2), '+91 98765 43210');
+    await tester.enterText(fields.at(3), 'Harvest#2026');
+    await tapVisible(tester, find.byType(PrimaryButton));
+    await settle(tester, 15);
+    expect(find.textContaining("isn't connected yet"), findsOneWidget);
+  });
+
+  testWidgets('Password strength meter reacts to the password', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SignUpScreen()));
+    await settle(tester);
+
+    final password = find.byType(TextField).at(3);
+    await tester.enterText(password, 'abc');
+    await settle(tester, 3);
+    expect(find.text('Weak'), findsOneWidget);
+
+    await tester.enterText(password, 'Harvest#2026');
+    await settle(tester, 3);
+    expect(find.text('Strong'), findsOneWidget);
   });
 }
