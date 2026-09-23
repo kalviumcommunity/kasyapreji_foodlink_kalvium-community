@@ -45,6 +45,11 @@ class AppColors {
   static const Color earthLight = Color(0xFFC9A27A);
   static const Color earthDark = Color(0xFF5A3E2A);
 
+  // Change page: the arch's forest green → steel blue → deep green.
+  static const Color archTop = Color(0xFF3E5E3F);
+  static const Color archMid = Color(0xFF4A6F8C);
+  static const Color archBottom = Color(0xFF2B4430);
+
   /// Deep forest green for headlines; body copy is a muted green-grey.
   static const Color ink = Color(0xFF163826);
   static const Color bodyText = Color(0xFF5B675F);

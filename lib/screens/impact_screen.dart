@@ -3,22 +3,25 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_photo.dart';
 import '../widgets/leaf.dart';
 import '../widgets/onboarding_layout.dart';
 import '../widgets/soft_backdrop.dart';
+import 'change_screen.dart';
+import 'onboarding_screen.dart' show onboardingAutoAdvance;
 
 /// Second onboarding screen: "Real Food. Real Impact."
 ///
 /// Artwork: a large circle holding a photo of volunteers packing food bags,
 /// framed by a light ring and a slowly turning dotted orbit, with two badges
 /// ("Less waste", "More meals") and swaying leaves around it. Warm backdrop
-/// tones echo the photo's earthy colours.
+/// tones echo the photo's earthy colours. Next leads to [ChangeScreen].
 class ImpactScreen extends StatefulWidget {
-  const ImpactScreen({super.key, this.onNext, this.onSkip});
+  const ImpactScreen({super.key, this.onSkip});
 
-  final VoidCallback? onNext;
+  /// Called when the skip button (top-right) is tapped.
   final VoidCallback? onSkip;
 
   @override
@@ -58,7 +61,10 @@ class _ImpactScreenState extends State<ImpactScreen> {
       backdrop: SoftBackdropPalette.warm,
       compactArt: _buildCompactArt,
       wideArt: _buildWideArt,
-      onNext: widget.onNext,
+      autoAdvanceAfter: onboardingAutoAdvance,
+      onNext: () =>
+          Navigator.of(context)
+              .push(softRoute(const ChangeScreen(), slide: true)),
       onSkip: widget.onSkip,
     );
   }
