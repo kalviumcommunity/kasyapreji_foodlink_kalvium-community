@@ -39,14 +39,20 @@ class LeafShape {
     return Path()
       ..moveTo(a.dx, a.dy)
       ..cubicTo(
-        (along(0.25) + left).dx, (along(0.25) + left).dy,
-        (along(0.75) + left).dx, (along(0.75) + left).dy,
-        b.dx, b.dy,
+        (along(0.25) + left).dx,
+        (along(0.25) + left).dy,
+        (along(0.75) + left).dx,
+        (along(0.75) + left).dy,
+        b.dx,
+        b.dy,
       )
       ..cubicTo(
-        (along(0.75) + right).dx, (along(0.75) + right).dy,
-        (along(0.25) + right).dx, (along(0.25) + right).dy,
-        a.dx, a.dy,
+        (along(0.75) + right).dx,
+        (along(0.75) + right).dy,
+        (along(0.25) + right).dx,
+        (along(0.25) + right).dy,
+        a.dx,
+        a.dy,
       )
       ..close();
   }
@@ -70,10 +76,7 @@ class LeafShape {
         ..shader = ui.Gradient.linear(
           mid + normal * bulgeLeft * scale,
           mid - normal * bulgeRight * scale,
-          [
-            light.withValues(alpha: opacity),
-            dark.withValues(alpha: opacity),
-          ],
+          [light.withValues(alpha: opacity), dark.withValues(alpha: opacity)],
         ),
     );
 

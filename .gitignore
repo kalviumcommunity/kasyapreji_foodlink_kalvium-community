@@ -47,5 +47,3 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# Web is only used for local previews; the app targets Android and iOS.
-/web/

@@ -1,11 +1,18 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
+import '../widgets/asset_photo.dart';
 import '../widgets/foodlink_logo.dart';
 import '../widgets/leaf.dart';
+import '../widgets/light_particles.dart';
+import '../widgets/rise_in.dart';
+import 'onboarding_screen.dart';
 
 /// Splash / app bootstrap screen.
 ///
@@ -14,8 +21,14 @@ import '../widgets/leaf.dart';
 ///
 /// Plays a one-off entrance (logo leaves grow in, text rises, leaves drift in),
 /// then loops ambient motion (leaves sway, light particles rise, loader pulses).
+/// Moves on to onboarding [holdAfterIntro] after the entrance finishes.
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({
+    super.key,
+    this.holdAfterIntro = const Duration(milliseconds: 1400),
+  });
+
+  final Duration holdAfterIntro;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -26,18 +39,27 @@ class _SplashScreenState extends State<SplashScreen>
   static const double _designWidth = 422;
   static const double _designHeight = 920;
 
-  late final AnimationController _intro = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2600),
-  )..forward();
+  late final AnimationController _intro =
+      AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 2600),
+        )
+        ..addStatusListener(_onIntroStatus)
+        ..forward();
 
   late final AnimationController _ambient = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 8),
   )..repeat();
 
-  Animation<double> _step(double begin, double end, [Curve curve = Curves.easeOutCubic]) =>
-      CurvedAnimation(parent: _intro, curve: Interval(begin, end, curve: curve));
+  Animation<double> _step(
+    double begin,
+    double end, [
+    Curve curve = Curves.easeOutCubic,
+  ]) => CurvedAnimation(
+    parent: _intro,
+    curve: Interval(begin, end, curve: curve),
+  );
 
   late final _glow = _step(0.0, 0.40);
   late final _logoLeaves = [
@@ -50,11 +72,53 @@ class _SplashScreenState extends State<SplashScreen>
   late final _floatingLeaves = _step(0.30, 0.78);
   late final _bottom = _step(0.60, 0.86);
   late final _loader = _step(0.80, 1.0);
+  late final _photoIn = _step(0.20, 0.75);
+
+  /// Volunteer handing fresh food to an elder, shown in the lower half.
+  final _photo = AssetPhoto('assets/images/splash_giving.jpg');
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _photo.resolve(context, () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Timer? _leaveTimer;
+
+  void _onIntroStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _leaveTimer = Timer(widget.holdAfterIntro, () {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder<void>(
+          transitionDuration: const Duration(milliseconds: 900),
+          pageBuilder: (_, _, _) => const OnboardingScreen(),
+          transitionsBuilder: (_, animation, _, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween(begin: 1.04, end: 1.0).animate(curved),
+                child: child,
+              ),
+            );
+          },
+        ),
+      );
+    });
+  }
 
   @override
   void dispose() {
+    _leaveTimer?.cancel();
     _intro.dispose();
     _ambient.dispose();
+    _photo.dispose();
     super.dispose();
   }
 
@@ -63,8 +127,8 @@ class _SplashScreenState extends State<SplashScreen>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
         systemNavigationBarColor: Colors.transparent,
         systemNavigationBarIconBrightness: Brightness.light,
         systemNavigationBarContrastEnforced: false,
@@ -74,6 +138,9 @@ class _SplashScreenState extends State<SplashScreen>
           builder: (context, constraints) {
             final sx = constraints.maxWidth / _designWidth;
             final sy = constraints.maxHeight / _designHeight;
+            // Sizes use the smaller scale so text never overlaps on wide or
+            // short screens; positions still follow each axis.
+            final s = math.min(sx, sy);
 
             return DecoratedBox(
               decoration: const BoxDecoration(
@@ -96,14 +163,16 @@ class _SplashScreenState extends State<SplashScreen>
                           time: _ambient.value,
                           leavesIn: _floatingLeaves.value,
                           particlesIn: _bottom.value,
+                          photo: _photo.image,
+                          photoIn: _photoIn.value,
                         ),
                       ),
                     ),
-                    _buildGlow(sx, sy),
-                    _buildLogo(sx, sy),
-                    _buildTitle(sx, sy),
-                    _buildBottomMessage(sx, sy),
-                    _buildLoader(sx, sy),
+                    _buildGlow(s, sy, constraints.maxWidth),
+                    _buildLogo(s, sy),
+                    _buildTitle(s, sy),
+                    _buildBottomMessage(s, sy),
+                    _buildLoader(s, sy),
                   ],
                 ),
               ),
@@ -114,12 +183,12 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildGlow(double sx, double sy) {
-    final size = 300 * sx;
+  Widget _buildGlow(double s, double sy, double width) {
+    final size = 300 * s;
     final pulse = 1 + 0.05 * math.sin(_ambient.value * 2 * math.pi * 2);
     return Positioned(
       top: 268 * sy - size / 2,
-      left: (_designWidth * sx - size) / 2,
+      left: (width - size) / 2,
       child: Opacity(
         opacity: _glow.value,
         child: Transform.scale(
@@ -131,9 +200,9 @@ class _SplashScreenState extends State<SplashScreen>
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  Colors.white.withValues(alpha: 0.85),
-                  AppColors.glow.withValues(alpha: 0.35),
-                  AppColors.glow.withValues(alpha: 0),
+                  AppColors.logoOnDark.withValues(alpha: 0.30),
+                  AppColors.logoOnDark.withValues(alpha: 0.10),
+                  AppColors.logoOnDark.withValues(alpha: 0),
                 ],
                 stops: const [0.0, 0.45, 1.0],
               ),
@@ -144,19 +213,21 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildLogo(double sx, double sy) {
-    // Gentle breathing once the logo has settled.
-    final breathe = 1 + 0.02 * math.sin(_ambient.value * 2 * math.pi * 2);
+  Widget _buildLogo(double s, double sy) {
+    // Gentle breathing, eased in as the entrance finishes.
+    final breathe =
+        1 + 0.02 * _loader.value * math.sin(_ambient.value * 2 * math.pi * 2);
     return Positioned(
       top: 225 * sy,
       left: 0,
       right: 0,
       child: Center(
         child: Transform.scale(
-          scale: _intro.isCompleted ? breathe : 1,
+          scale: breathe,
           alignment: Alignment.bottomCenter,
           child: FoodLinkLogo(
-            width: 130 * sx,
+            width: 130 * s,
+            color: AppColors.logoOnDark,
             growth: [for (final leaf in _logoLeaves) leaf.value],
           ),
         ),
@@ -164,35 +235,40 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildTitle(double sx, double sy) {
+  Widget _buildTitle(double s, double sy) {
     return Positioned(
       top: 336 * sy,
       left: 16,
       right: 16,
       child: Column(
         children: [
-          _rise(
-            _title.value,
-            20 * sy,
-            ShaderMask(
+          RiseIn(
+            progress: _title.value,
+            distance: 20 * sy,
+            child: ShaderMask(
               blendMode: BlendMode.srcIn,
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.brandDark, AppColors.brand, AppColors.brandDark],
+                colors: [
+                  AppColors.white,
+                  AppColors.logoOnDark,
+                  AppColors.white,
+                ],
                 stops: [0.0, 0.5, 1.0],
               ).createShader(bounds),
               child: Text(
                 'FoodLink',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 38 * sx,
+                  fontFamily: AppFonts.display,
+                  fontSize: 42 * s,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: -0.6 * sx,
+                  letterSpacing: -0.4 * s,
                   height: 1.2,
                   shadows: [
                     Shadow(
-                      color: AppColors.brandDark.withValues(alpha: 0.18),
-                      offset: Offset(0, 3 * sx),
-                      blurRadius: 10 * sx,
+                      color: Colors.black.withValues(alpha: 0.35),
+                      offset: Offset(0, 3 * s),
+                      blurRadius: 14 * s,
                     ),
                   ],
                 ),
@@ -200,18 +276,25 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
           SizedBox(height: 16 * sy),
-          _rise(
-            _tagline.value,
-            14 * sy,
-            Text(
+          RiseIn(
+            progress: _tagline.value,
+            distance: 14 * sy,
+            child: Text(
               'Good Food\nBrighter Futures',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 19 * sx,
+                fontSize: 19 * s,
                 fontWeight: FontWeight.w500,
-                letterSpacing: 0.2 * sx,
-                color: AppColors.brandText,
+                letterSpacing: 0.2 * s,
+                color: AppColors.taglineOnDark,
                 height: 1.68,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    offset: Offset(0, 2 * s),
+                    blurRadius: 10 * s,
+                  ),
+                ],
               ),
             ),
           ),
@@ -220,27 +303,27 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildBottomMessage(double sx, double sy) {
+  Widget _buildBottomMessage(double s, double sy) {
     return Positioned(
       top: 780 * sy,
       left: 16,
       right: 16,
-      child: _rise(
-        _bottom.value,
-        16 * sy,
-        Text(
+      child: RiseIn(
+        progress: _bottom.value,
+        distance: 16 * sy,
+        child: Text(
           'A Hunger-Free Tomorrow\nStarts With You',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 19 * sx,
+            fontSize: 19 * s,
             fontWeight: FontWeight.w500,
             color: AppColors.white,
             height: 1.72,
             shadows: [
               Shadow(
                 color: Colors.black.withValues(alpha: 0.25),
-                offset: Offset(0, 2 * sx),
-                blurRadius: 8 * sx,
+                offset: Offset(0, 2 * s),
+                blurRadius: 8 * s,
               ),
             ],
           ),
@@ -250,7 +333,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   /// Three dots that pulse in turn while the app loads.
-  Widget _buildLoader(double sx, double sy) {
+  Widget _buildLoader(double s, double sy) {
     final beat = _ambient.value * 8; // one pulse per second
     return Positioned(
       top: 870 * sy,
@@ -262,33 +345,26 @@ class _SplashScreenState extends State<SplashScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             for (var i = 0; i < 3; i++)
-              Builder(builder: (context) {
-                final t = (beat - i * 0.18) % 1.0;
-                final pulse = math.max(0.0, math.sin(t * math.pi));
-                final d = (6 + 3 * pulse) * sx;
-                return Container(
-                  margin: EdgeInsets.symmetric(horizontal: 4 * sx),
-                  width: d,
-                  height: d,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.white.withValues(alpha: 0.35 + 0.65 * pulse),
-                  ),
-                );
-              }),
+              Builder(
+                builder: (context) {
+                  final t = (beat - i * 0.18) % 1.0;
+                  final pulse = math.max(0.0, math.sin(t * math.pi));
+                  final d = (6 + 3 * pulse) * s;
+                  return Container(
+                    margin: EdgeInsets.symmetric(horizontal: 4 * s),
+                    width: d,
+                    height: d,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.white.withValues(
+                        alpha: 0.35 + 0.65 * pulse,
+                      ),
+                    ),
+                  );
+                },
+              ),
           ],
         ),
-      ),
-    );
-  }
-
-  /// Fades [child] in while sliding it up by [distance].
-  Widget _rise(double t, double distance, Widget child) {
-    return Opacity(
-      opacity: t.clamp(0.0, 1.0),
-      child: Transform.translate(
-        offset: Offset(0, (1 - t) * distance),
-        child: child,
       ),
     );
   }
@@ -303,6 +379,8 @@ class _AmbientPainter extends CustomPainter {
     required this.time,
     required this.leavesIn,
     required this.particlesIn,
+    this.photo,
+    this.photoIn = 1,
   });
 
   final double sx;
@@ -310,6 +388,14 @@ class _AmbientPainter extends CustomPainter {
   final double time;
   final double leavesIn;
   final double particlesIn;
+  final ui.Image? photo;
+  final double photoIn;
+
+  /// Film over the full-screen photo, by height: darker behind the logo and
+  /// title, lighter where the hands and apples are, and darkest at the bottom
+  /// for the closing message.
+  static const _scrimAlpha = [0.72, 0.58, 0.50, 0.28, 0.30, 0.62, 0.90];
+  static const _scrimStops = [0.0, 0.22, 0.45, 0.60, 0.72, 0.85, 1.0];
 
   static const _leaves = [
     // Upper-left leaf
@@ -342,29 +428,23 @@ class _AmbientPainter extends CustomPainter {
   ];
 
   // Where each leaf drifts in from, and its sway phase.
-  static const _entryOffsets = [Offset(-40, -60), Offset(-60, 30), Offset(50, 60)];
+  static const _entryOffsets = [
+    Offset(-40, -60),
+    Offset(-60, 30),
+    Offset(50, 60),
+  ];
   static const _phases = [0.0, 0.33, 0.66];
 
-  static final List<_Particle> _particles = () {
-    final rnd = math.Random(7);
-    return List.generate(18, (_) {
-      return _Particle(
-        x: rnd.nextDouble() * 422,
-        radius: 1.2 + rnd.nextDouble() * 1.8,
-        speed: 1 + rnd.nextInt(2).toDouble(),
-        offset: rnd.nextDouble(),
-        maxAlpha: 0.25 + rnd.nextDouble() * 0.35,
-      );
-    });
-  }();
+  static final _particles = LightParticles(top: 120, bottom: 920);
 
   @override
   void paint(Canvas canvas, Size size) {
-    _paintParticles(canvas);
-    _paintLeaves(canvas);
+    _paintPhoto(canvas, size);
+    _particles.paint(canvas, sx: sx, sy: sy, time: time, opacity: particlesIn);
+    _paintLeaves(canvas, size);
   }
 
-  void _paintLeaves(Canvas canvas) {
+  void _paintLeaves(Canvas canvas, Size size) {
     for (var i = 0; i < _leaves.length; i++) {
       final leaf = _leaves[i];
       final wave = 2 * math.pi * (time * 2 + _phases[i]);
@@ -375,40 +455,63 @@ class _AmbientPainter extends CustomPainter {
 
       // Leaf centre in screen space: x follows width, y follows height.
       final c = leaf.centre;
-      final target = Offset(c.dx * sx, c.dy * sy) + (bob + entry) * sx;
+      final s = math.min(sx, sy);
+      // On wide screens the leaves hug the left edge (and are mirrored onto
+      // the right) instead of stretching across the middle.
+      final wide = size.width > size.height;
+      final x = wide ? c.dx * s * 1.5 + size.width * 0.05 : c.dx * sx;
+      final target = Offset(x, c.dy * sy) + (bob + entry) * s;
 
-      canvas.save();
-      canvas.translate(target.dx, target.dy);
-      canvas.rotate(sway + spinIn);
-      canvas.translate(-c.dx * sx, -c.dy * sx);
-      leaf.paint(canvas, sx, opacity: leavesIn);
-      canvas.restore();
+      for (final mirrored in [false, if (wide) true]) {
+        canvas.save();
+        if (mirrored) {
+          canvas.translate(size.width, 0);
+          canvas.scale(-1, 1);
+        }
+        canvas.translate(target.dx, target.dy);
+        canvas.rotate(sway + spinIn);
+        canvas.translate(-c.dx * s, -c.dy * s);
+        leaf.paint(canvas, s, opacity: leavesIn);
+        canvas.restore();
+      }
     }
   }
 
-  void _paintParticles(Canvas canvas) {
-    if (particlesIn <= 0) return;
-    const top = 470.0;
-    const bottom = 920.0;
-    for (final p in _particles) {
-      final progress = (time * p.speed + p.offset) % 1.0;
-      final y = bottom - progress * (bottom - top);
-      final x = p.x + math.sin(progress * 2 * math.pi * 1.5 + p.offset * 6) * 8;
-      final alpha = math.sin(progress * math.pi) * p.maxAlpha * particlesIn;
-      final centre = Offset(x * sx, y * sy);
-      canvas.drawCircle(
-        centre,
-        p.radius * 3 * sx,
-        Paint()
-          ..color = AppColors.particle.withValues(alpha: alpha * 0.25)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 * sx),
-      );
-      canvas.drawCircle(
-        centre,
-        p.radius * sx,
-        Paint()..color = AppColors.particle.withValues(alpha: alpha),
-      );
-    }
+  void _paintPhoto(Canvas canvas, Size size) {
+    final image = photo;
+    if (image == null || photoIn <= 0) return;
+    final rect = Offset.zero & size;
+    final s = math.min(sx, sy);
+    // Keep the hands and apples centred whatever the crop.
+    paintPhotoCover(
+      canvas,
+      image,
+      rect,
+      alignment: const Alignment(-0.05, 0.1),
+      zoom: 1.05 + 0.04 * math.sin(time * 2 * math.pi),
+      opacity: photoIn,
+    );
+    final fade = photoIn.clamp(0.0, 1.0);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(rect.topCenter, rect.bottomCenter, [
+          for (final a in _scrimAlpha)
+            AppColors.splashScrim.withValues(alpha: a * fade),
+        ], _scrimStops),
+    );
+    // Extra shade behind the logo and title.
+    final titleCentre = Offset(size.width / 2, 330 * sy);
+    final radius = 280 * s;
+    canvas.drawCircle(
+      titleCentre,
+      radius,
+      Paint()
+        ..shader = ui.Gradient.radial(titleCentre, radius, [
+          AppColors.splashScrim.withValues(alpha: 0.58 * fade),
+          AppColors.splashScrim.withValues(alpha: 0),
+        ]),
+    );
   }
 
   @override
@@ -416,22 +519,8 @@ class _AmbientPainter extends CustomPainter {
       oldDelegate.time != time ||
       oldDelegate.leavesIn != leavesIn ||
       oldDelegate.particlesIn != particlesIn ||
+      oldDelegate.photo != photo ||
+      oldDelegate.photoIn != photoIn ||
       oldDelegate.sx != sx ||
       oldDelegate.sy != sy;
-}
-
-class _Particle {
-  const _Particle({
-    required this.x,
-    required this.radius,
-    required this.speed,
-    required this.offset,
-    required this.maxAlpha,
-  });
-
-  final double x;
-  final double radius;
-  final double speed;
-  final double offset;
-  final double maxAlpha;
 }

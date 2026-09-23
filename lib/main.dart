@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'screens/splash_screen.dart';
 import 'theme/app_colors.dart';
+import 'theme/app_fonts.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,7 @@ class FoodLinkApp extends StatelessWidget {
       title: 'FoodLink',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        fontFamily: 'Inter',
+        fontFamily: AppFonts.body,
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.brand),
       ),
       home: const SplashScreen(),
