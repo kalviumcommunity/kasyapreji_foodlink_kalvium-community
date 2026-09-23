@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/asset_photo.dart';
@@ -91,25 +92,8 @@ class _SplashScreenState extends State<SplashScreen>
     if (status != AnimationStatus.completed) return;
     _leaveTimer = Timer(widget.holdAfterIntro, () {
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder<void>(
-          transitionDuration: const Duration(milliseconds: 900),
-          pageBuilder: (_, _, _) => const OnboardingScreen(),
-          transitionsBuilder: (_, animation, _, child) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeInOutCubic,
-            );
-            return FadeTransition(
-              opacity: curved,
-              child: ScaleTransition(
-                scale: Tween(begin: 1.04, end: 1.0).animate(curved),
-                child: child,
-              ),
-            );
-          },
-        ),
-      );
+      Navigator.of(context)
+          .pushReplacement(softRoute(const OnboardingScreen()));
     });
   }
 

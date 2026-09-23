@@ -24,6 +24,7 @@ flutter:
   assets:
     - assets/images/splash_giving.jpg
     - assets/images/onboarding_community_meal.jpg
+    - assets/images/impact_packing.jpg
 
   # Fraunces (headings) and Plus Jakarta Sans (body), both SIL OFL 1.1.
   fonts:
