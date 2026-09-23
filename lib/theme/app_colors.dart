@@ -35,6 +35,15 @@ class AppColors {
   static const Color glowMint = Color(0xFFCDE6C0);
   static const Color glowPeach = Color(0xFFF6DFC2);
   static const Color glowSage = Color(0xFFD9E9CF);
+  static const List<Color> backdropWarm = [
+    Color(0xFFF6F2EB),
+    Color(0xFFECE5DB),
+  ];
+  static const Color glowSand = Color(0xFFEBDAC4);
+
+  // Impact page: warm earth tones around the photo circle.
+  static const Color earthLight = Color(0xFFC9A27A);
+  static const Color earthDark = Color(0xFF5A3E2A);
 
   /// Deep forest green for headlines; body copy is a muted green-grey.
   static const Color ink = Color(0xFF163826);

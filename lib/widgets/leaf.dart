@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -107,4 +108,33 @@ class LeafShape {
       );
     }
   }
+}
+
+/// Paints [leaf] centred on [target] at [scale]: it drifts in from [entry]
+/// (in design units) while spinning into place as [appear] goes 0 → 1, then
+/// sways and bobs gently with the looping [time]. [phase] staggers leaves.
+void paintSwayingLeaf(
+  Canvas canvas,
+  LeafShape leaf, {
+  required Offset target,
+  required double scale,
+  required double time,
+  required double appear,
+  double phase = 0.2,
+  Offset entry = const Offset(60, -50),
+}) {
+  if (appear <= 0) return;
+  final wave = 2 * math.pi * (time * 2 + phase);
+  final sway = math.sin(wave) * 0.08;
+  final bob = Offset(math.cos(wave) * 2, math.sin(wave) * 5);
+  final spinIn = (1 - appear) * 0.8;
+
+  final c = leaf.centre;
+  final at = target + (bob + entry * (1 - appear)) * scale;
+  canvas.save();
+  canvas.translate(at.dx, at.dy);
+  canvas.rotate(sway + spinIn);
+  canvas.translate(-c.dx * scale, -c.dy * scale);
+  leaf.paint(canvas, scale, opacity: appear);
+  canvas.restore();
 }
