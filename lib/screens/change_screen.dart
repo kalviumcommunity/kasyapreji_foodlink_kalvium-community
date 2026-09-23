@@ -3,22 +3,22 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_photo.dart';
 import '../widgets/leaf.dart';
 import '../widgets/onboarding_layout.dart';
+import 'sign_in_screen.dart';
 
 /// Last onboarding screen: "Be the Change".
 ///
 /// Artwork: a tall arch holding a photo of a volunteer team, tinted in the
 /// design's forest-green-to-steel-blue, with three action badges ("Donate",
 /// "Volunteer", "Organize") along its edge. The matching words in the body
-/// light up in turn and the badge for the lit word lifts and glows.
+/// light up in turn and the badge for the lit word lifts and glows. Next
+/// leads to [SignInScreen].
 class ChangeScreen extends StatefulWidget {
-  const ChangeScreen({super.key, this.onNext});
-
-  /// Called when the (white) next button is tapped.
-  final VoidCallback? onNext;
+  const ChangeScreen({super.key});
 
   @override
   State<ChangeScreen> createState() => _ChangeScreenState();
@@ -61,7 +61,8 @@ class _ChangeScreenState extends State<ChangeScreen> {
       wideArtAspectRatio: 0.86,
       compactArt: _buildCompactArt,
       wideArt: _buildWideArt,
-      onNext: widget.onNext,
+      autoAdvanceAfter: onboardingAutoAdvance,
+      onNext: () => Navigator.of(context).push(softRoute(const SignInScreen())),
     );
   }
 

@@ -9,6 +9,7 @@ import '../widgets/leaf.dart';
 import '../widgets/meadow_band.dart';
 import '../widgets/onboarding_layout.dart';
 import 'impact_screen.dart';
+import 'sign_in_screen.dart';
 
 /// First onboarding screen: "Good Food Creates Brighter Futures".
 ///
@@ -16,10 +17,7 @@ import 'impact_screen.dart';
 /// wavy, undulating edge, and a swaying leaf beside the headline. On laptops
 /// the meadow becomes a rounded photo card. Next leads to [ImpactScreen].
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key, this.onSkip});
-
-  /// Called when the skip button (top-right) is tapped.
-  final VoidCallback? onSkip;
+  const OnboardingScreen({super.key});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -67,14 +65,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       onNext: () =>
           Navigator.of(context)
               .push(softRoute(const ImpactScreen(), slide: true)),
-      onSkip: widget.onSkip,
+      onSkip: () => Navigator.of(context).push(softRoute(const SignInScreen())),
     );
   }
 }
-
-/// How long each onboarding page waits (after its entrance) before moving on
-/// by itself.
-const onboardingAutoAdvance = Duration(seconds: 5);
 
 /// The swaying leaf shown beside the headline.
 const _leafShape = LeafShape(

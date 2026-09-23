@@ -5,6 +5,7 @@ import 'package:foodlink/main.dart';
 import 'package:foodlink/screens/change_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
 import 'package:foodlink/screens/onboarding_screen.dart';
+import 'package:foodlink/screens/sign_in_screen.dart';
 
 void main() {
   testWidgets('Splash screen shows brand name and taglines', (tester) async {
@@ -96,5 +97,95 @@ void main() {
       if (i % 20 == 0) await tester.tap(find.text('Good Food'));
     }
     expect(find.byType(ImpactScreen), findsNothing);
+  });
+
+  Future<void> settle(WidgetTester tester, [int steps = 20]) async {
+    for (var i = 0; i < steps; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
+  testWidgets('Next on Be the Change opens Sign In', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ChangeScreen()));
+    await settle(tester, 25);
+    await tester.tap(find.bySemanticsLabel('Next'));
+    await settle(tester, 15);
+
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(find.text('Welcome Back'), findsOneWidget);
+    expect(find.text('Good to see you again!'), findsOneWidget);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
+  });
+
+  testWidgets('Skip on onboarding opens Sign In', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: OnboardingScreen()));
+    await settle(tester, 25);
+    await tester.tap(find.bySemanticsLabel('Skip'));
+    await settle(tester, 15);
+
+    expect(find.byType(SignInScreen), findsOneWidget);
+  });
+
+  testWidgets('Sign In validates its fields', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
+    await settle(tester);
+
+    await tester.tap(find.bySemanticsLabel('Sign In'));
+    await settle(tester, 5);
+    expect(find.text('Please enter your email'), findsOneWidget);
+    expect(find.text('Please enter your password'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).at(0), 'not-an-email');
+    await tester.enterText(find.byType(TextField).at(1), '123');
+    await tester.tap(find.bySemanticsLabel('Sign In'));
+    await settle(tester, 5);
+    expect(find.text("That email doesn't look right"), findsOneWidget);
+    expect(find.text('Password must be at least 6 characters'), findsOneWidget);
+
+    // Typing clears the error.
+    await tester.enterText(find.byType(TextField).at(0), 'a@b.co');
+    await settle(tester, 3);
+    expect(find.text("That email doesn't look right"), findsNothing);
+  });
+
+  testWidgets('Password eye toggles visibility', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
+    await settle(tester);
+
+    TextField password() =>
+        tester.widget<TextField>(find.byType(TextField).at(1));
+    expect(password().obscureText, isTrue);
+    await tester.tap(find.bySemanticsLabel('Show password'));
+    await settle(tester, 3);
+    expect(password().obscureText, isFalse);
+    await tester.tap(find.bySemanticsLabel('Hide password'));
+    await settle(tester, 3);
+    expect(password().obscureText, isTrue);
+  });
+
+  testWidgets('Valid sign in shows the not-connected notice', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
+    await settle(tester);
+
+    await tester.enterText(
+      find.byType(TextField).at(0),
+      'volunteer@foodlink.org',
+    );
+    await tester.enterText(find.byType(TextField).at(1), 'secret123');
+    await tester.tap(find.bySemanticsLabel('Sign In'));
+    await settle(tester, 15);
+
+    expect(find.textContaining("isn't connected yet"), findsOneWidget);
+  });
+
+  testWidgets('Remember me toggles', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
+    await settle(tester);
+
+    final remember = find.bySemanticsLabel('Remember me');
+    expect(tester.getSemantics(remember), isSemantics(isChecked: true));
+    await tester.tap(remember);
+    await settle(tester, 3);
+    expect(tester.getSemantics(remember), isSemantics(isChecked: false));
   });
 }

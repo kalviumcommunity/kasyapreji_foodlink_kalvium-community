@@ -10,7 +10,7 @@ import '../widgets/leaf.dart';
 import '../widgets/onboarding_layout.dart';
 import '../widgets/soft_backdrop.dart';
 import 'change_screen.dart';
-import 'onboarding_screen.dart' show onboardingAutoAdvance;
+import 'sign_in_screen.dart';
 
 /// Second onboarding screen: "Real Food. Real Impact."
 ///
@@ -19,10 +19,7 @@ import 'onboarding_screen.dart' show onboardingAutoAdvance;
 /// ("Less waste", "More meals") and swaying leaves around it. Warm backdrop
 /// tones echo the photo's earthy colours. Next leads to [ChangeScreen].
 class ImpactScreen extends StatefulWidget {
-  const ImpactScreen({super.key, this.onSkip});
-
-  /// Called when the skip button (top-right) is tapped.
-  final VoidCallback? onSkip;
+  const ImpactScreen({super.key});
 
   @override
   State<ImpactScreen> createState() => _ImpactScreenState();
@@ -65,7 +62,7 @@ class _ImpactScreenState extends State<ImpactScreen> {
       onNext: () =>
           Navigator.of(context)
               .push(softRoute(const ChangeScreen(), slide: true)),
-      onSkip: widget.onSkip,
+      onSkip: () => Navigator.of(context).push(softRoute(const SignInScreen())),
     );
   }
 
