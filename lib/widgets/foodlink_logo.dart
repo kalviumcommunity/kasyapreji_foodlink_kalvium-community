@@ -26,7 +26,9 @@ class FoodLinkLogo extends StatelessWidget {
     return SizedBox(
       width: width,
       height: width * designSize.height / designSize.width,
-      child: CustomPaint(painter: _LogoPainter(color: color, growth: growth)),
+      child: CustomPaint(
+        painter: _LogoPainter(color: color, growth: growth),
+      ),
     );
   }
 }
@@ -38,31 +40,31 @@ class _LogoPainter extends CustomPainter {
   final List<double> growth;
 
   List<LeafShape> get _leaves => [
-        // Centre leaf
-        LeafShape(
-          tipA: const Offset(65, 0),
-          tipB: const Offset(65, 54),
-          bulgeLeft: 10,
-          bulgeRight: 10,
-          color: color,
-        ),
-        // Left leaf
-        LeafShape(
-          tipA: const Offset(0, 20),
-          tipB: const Offset(60, 84),
-          bulgeLeft: 13,
-          bulgeRight: 20,
-          color: color,
-        ),
-        // Right leaf
-        LeafShape(
-          tipA: const Offset(130, 20),
-          tipB: const Offset(70, 84),
-          bulgeLeft: 20,
-          bulgeRight: 13,
-          color: color,
-        ),
-      ];
+    // Centre leaf
+    LeafShape(
+      tipA: const Offset(65, 0),
+      tipB: const Offset(65, 54),
+      bulgeLeft: 10,
+      bulgeRight: 10,
+      color: color,
+    ),
+    // Left leaf
+    LeafShape(
+      tipA: const Offset(0, 20),
+      tipB: const Offset(60, 84),
+      bulgeLeft: 13,
+      bulgeRight: 20,
+      color: color,
+    ),
+    // Right leaf
+    LeafShape(
+      tipA: const Offset(130, 20),
+      tipB: const Offset(70, 84),
+      bulgeLeft: 20,
+      bulgeRight: 13,
+      color: color,
+    ),
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
