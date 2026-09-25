@@ -85,6 +85,19 @@ class AppColors {
   static const Color error = Color(0xFFC4453A);
   static const List<Color> avatar = [Color(0xFFC99C74), Color(0xFF6E4A33)];
 
+  // Role cards: soft green when chosen, cool grey when not.
+  static const Color roleChosenFill = Color(0xFFE6F0E5);
+  static const Color roleChosenBorder = Color(0xFFBFD8BE);
+  static const Color roleChosenCircle = Color(0xFFD2E6D1);
+  static const Color roleIdleFill = Color(0xFFF0F1F3);
+  static const Color roleIdleBorder = Color(0xFFE3E5E8);
+  static const Color roleIdleCircle = Color(0xFFE2E5EA);
+  static const Color roleIdleIcon = Color(0xFF5E6A7E);
+
+  /// Step dots: done, current (brand), and still to come.
+  static const Color stepDone = Color(0xFFC9DDC8);
+  static const Color stepTodo = Color(0xFFE4ECE3);
+
   // Splash effects
   static const Color glow = Color(0xFFDCEBD5);
   static const Color particle = Color(0xFFF4F9E8);
