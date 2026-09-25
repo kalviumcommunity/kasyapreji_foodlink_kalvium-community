@@ -24,6 +24,8 @@ class _RoleInfo {
     required this.title,
     required this.lines,
     required this.icon,
+    required this.photo,
+    required this.photoFocus,
     required this.perksTitle,
     required this.perks,
   });
@@ -33,6 +35,11 @@ class _RoleInfo {
   /// Card description, one short line each (as in the design).
   final List<String> lines;
   final IconData icon;
+
+  /// Asset path of the card photo, and the point to keep in view when it's
+  /// cropped.
+  final String photo;
+  final Alignment photoFocus;
   final String perksTitle;
   final List<(IconData, String)> perks;
 }
@@ -42,6 +49,9 @@ const _roles = {
     title: 'Volunteer',
     lines: ['Join events,', 'help on-ground,', 'make a difference.'],
     icon: Icons.person_rounded,
+    // Two volunteers packing boxes of food.
+    photo: 'assets/images/role_volunteer.jpg',
+    photoFocus: Alignment(0.1, -0.3),
     perksTitle: "As a volunteer, you'll",
     perks: [
       (Icons.event_available_rounded, 'Find food drives near you'),
@@ -53,6 +63,9 @@ const _roles = {
     title: 'Coordinator',
     lines: ['Manage events,', 'organize volunteers,', 'track impact.'],
     icon: Icons.work_rounded,
+    // A coordinator with a clipboard, her volunteer team behind her.
+    photo: 'assets/images/role_coordinator.jpg',
+    photoFocus: Alignment(0.25, -0.2),
     perksTitle: "As a coordinator, you'll",
     perks: [
       (Icons.add_location_alt_rounded, 'Set up distribution events'),
@@ -64,7 +77,7 @@ const _roles = {
 
 /// Account setup, step 3 of 5: "I am a..." — Volunteer or Coordinator.
 ///
-/// Two cards (Volunteer chosen to start, as in the design). The chosen card
+/// Two photo cards (Volunteer chosen to start, as in the design). The chosen card
 /// turns green with a check badge and a pulsing halo round its icon, and a
 /// panel below lists what that role can do. Arrow keys switch roles and Enter
 /// continues, for keyboards on the web.
@@ -108,6 +121,15 @@ class _RoleScreenState extends State<RoleScreen> with TickerProviderStateMixin {
     return Curves.easeOutCubic.transform(
       ((_intro.value - start) / 0.4).clamp(0.0, 1.0),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Decode both card photos up front so neither pops in.
+    for (final info in _roles.values) {
+      precacheImage(AssetImage(info.photo), context);
+    }
   }
 
   @override
@@ -643,8 +665,13 @@ class _CardEntrance extends StatelessWidget {
   }
 }
 
-/// One role option. Chosen: soft green with a check badge and a pulsing halo
-/// round a gently floating icon. Lifts on hover and dips when pressed.
+/// One role option: a photo on top with the role's icon badge sitting on its
+/// lower edge, then the title and description.
+///
+/// Chosen: soft green, the photo in full colour and slowly zooming, a check
+/// badge, and a pulsing halo round a gently floating icon. Not chosen: cool
+/// grey with the photo faded to near-greyscale. Lifts on hover and dips when
+/// pressed.
 class _RoleCard extends StatefulWidget {
   const _RoleCard({
     required this.info,
@@ -668,6 +695,19 @@ class _RoleCardState extends State<_RoleCard> {
   bool _hovered = false;
   bool _pressed = false;
 
+  /// Colour matrix that blends between greyscale (0) and full colour (1).
+  static List<double> _saturation(double amount) {
+    const r = 0.2126, g = 0.7152, b = 0.0722;
+    final a = amount;
+    final i = 1 - a;
+    return [
+      r * i + a, g * i, b * i, 0, 0, //
+      r * i, g * i + a, b * i, 0, 0, //
+      r * i, g * i, b * i + a, 0, 0, //
+      0, 0, 0, 1, 0, //
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.scale;
@@ -675,11 +715,12 @@ class _RoleCardState extends State<_RoleCard> {
     final info = widget.info;
     const duration = Duration(milliseconds: 320);
     final radius = BorderRadius.circular(22 * s);
+    final inset = 8 * s;
     final wave = widget.time * 4 % 1.0; // one halo pulse every 2 seconds
     final float = selected
         ? math.sin(widget.time * 2 * math.pi * 3) * 3 * s
         : 0.0;
-    final circle = 72 * s;
+    final circle = 56 * s;
 
     return Semantics(
       button: true,
@@ -744,65 +785,37 @@ class _RoleCardState extends State<_RoleCard> {
                   ),
                 ],
               ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10 * s),
+              // 0 → 1 as the card becomes the chosen one.
+              child: TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 450),
+                curve: Curves.easeOutCubic,
+                tween: Tween(end: selected ? 1 : 0),
+                builder: (context, t, _) => Stack(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(inset, inset, inset, 14 * s),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          SizedBox(
-                            width: circle * 1.5,
-                            height: circle * 1.5,
+                          Expanded(
                             child: Stack(
-                              alignment: Alignment.center,
+                              clipBehavior: Clip.none,
+                              alignment: Alignment.bottomCenter,
                               children: [
-                                if (selected)
-                                  Container(
-                                    width: circle * (1 + 0.45 * wave),
-                                    height: circle * (1 + 0.45 * wave),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: AppColors.brand.withValues(
-                                          alpha: 0.28 * (1 - wave),
-                                        ),
-                                        width: 2 * s,
-                                      ),
-                                    ),
-                                  ),
-                                Transform.translate(
-                                  offset: Offset(0, float),
-                                  child: AnimatedContainer(
-                                    duration: duration,
-                                    width: circle,
-                                    height: circle,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: selected
-                                          ? AppColors.roleChosenCircle
-                                          : AppColors.roleIdleCircle,
-                                    ),
-                                    child: TweenAnimationBuilder<Color?>(
-                                      duration: duration,
-                                      tween: ColorTween(
-                                        end: selected
-                                            ? AppColors.brand
-                                            : AppColors.roleIdleIcon,
-                                      ),
-                                      builder: (context, color, _) => Icon(
-                                        info.icon,
-                                        size: 34 * s,
-                                        color: color,
-                                      ),
-                                    ),
+                                Positioned.fill(child: _photo(s, t)),
+                                Positioned(
+                                  bottom: -circle / 2 - circle * 0.25,
+                                  child: _iconBadge(
+                                    s,
+                                    circle,
+                                    t,
+                                    wave: wave,
+                                    float: float,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          SizedBox(height: 14 * s),
+                          SizedBox(height: circle / 2 + 12 * s),
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
@@ -815,7 +828,7 @@ class _RoleCardState extends State<_RoleCard> {
                               ),
                             ),
                           ),
-                          SizedBox(height: 12 * s),
+                          SizedBox(height: 6 * s),
                           for (final line in info.lines)
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -823,7 +836,7 @@ class _RoleCardState extends State<_RoleCard> {
                                 line,
                                 style: TextStyle(
                                   fontSize: 14 * s,
-                                  height: 1.9,
+                                  height: 1.7,
                                   color: AppColors.bodyText,
                                 ),
                               ),
@@ -831,44 +844,154 @@ class _RoleCardState extends State<_RoleCard> {
                         ],
                       ),
                     ),
-                  ),
-                  // Check badge, springing in on the chosen card.
-                  Positioned(
-                    top: 12 * s,
-                    right: 12 * s,
-                    child: AnimatedScale(
-                      scale: selected ? 1 : 0,
-                      duration: const Duration(milliseconds: 500),
-                      curve: selected ? Curves.elasticOut : Curves.easeIn,
-                      child: Container(
-                        width: 24 * s,
-                        height: 24 * s,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF3A7550), AppColors.brand],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.brand.withValues(alpha: 0.3),
-                              blurRadius: 8 * s,
-                              offset: Offset(0, 2 * s),
+                    // Check badge, springing in on the chosen card.
+                    Positioned(
+                      top: 16 * s,
+                      right: 16 * s,
+                      child: AnimatedScale(
+                        scale: selected ? 1 : 0,
+                        duration: const Duration(milliseconds: 500),
+                        curve: selected ? Curves.elasticOut : Curves.easeIn,
+                        child: Container(
+                          width: 26 * s,
+                          height: 26 * s,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF3A7550), AppColors.brand],
                             ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.check_rounded,
-                          size: 16 * s,
-                          color: AppColors.white,
+                            border: Border.all(
+                              color: AppColors.white,
+                              width: 2 * s,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.25),
+                                blurRadius: 8 * s,
+                                offset: Offset(0, 2 * s),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 15 * s,
+                            color: AppColors.white,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// The role's photo: colour and a slow zoom fade in with [t].
+  Widget _photo(double s, double t) {
+    final zoom = 1.04 + 0.05 * t * math.sin(widget.time * 2 * math.pi);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16 * s),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ColorFiltered(
+            colorFilter: ColorFilter.matrix(_saturation(0.2 + 0.8 * t)),
+            child: Transform.scale(
+              scale: zoom,
+              child: Image.asset(
+                widget.info.photo,
+                fit: BoxFit.cover,
+                alignment: widget.info.photoFocus,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) =>
+                    const ColoredBox(color: AppColors.roleIdleCircle),
+              ),
+            ),
+          ),
+          // Soft green wash at the foot so the icon badge sits comfortably,
+          // and a pale veil over the photo when not chosen.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppColors.splashScrim.withValues(alpha: 0),
+                  AppColors.splashScrim.withValues(alpha: 0.35),
+                ],
+                stops: const [0.55, 1],
+              ),
+            ),
+          ),
+          ColoredBox(
+            color: AppColors.roleIdleFill.withValues(alpha: 0.28 * (1 - t)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The role's icon in a ringed circle, with a pulsing halo when chosen.
+  Widget _iconBadge(
+    double s,
+    double circle,
+    double t, {
+    required double wave,
+    required double float,
+  }) {
+    return SizedBox(
+      width: circle * 1.5,
+      height: circle * 1.5,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (t > 0)
+            Container(
+              width: circle * (1 + 0.45 * wave),
+              height: circle * (1 + 0.45 * wave),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.brand.withValues(
+                    alpha: 0.3 * t * (1 - wave),
+                  ),
+                  width: 2 * s,
+                ),
+              ),
+            ),
+          Transform.translate(
+            offset: Offset(0, float),
+            child: Container(
+              width: circle,
+              height: circle,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color.lerp(
+                  AppColors.roleIdleCircle,
+                  AppColors.roleChosenCircle,
+                  t,
+                ),
+                border: Border.all(color: AppColors.white, width: 3 * s),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.splashScrim.withValues(alpha: 0.18),
+                    blurRadius: 12 * s,
+                    offset: Offset(0, 4 * s),
+                  ),
+                ],
+              ),
+              child: Icon(
+                widget.info.icon,
+                size: 26 * s,
+                color: Color.lerp(AppColors.roleIdleIcon, AppColors.brand, t),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
