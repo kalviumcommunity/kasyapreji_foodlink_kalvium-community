@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:foodlink/auth/demo_account.dart';
 import 'package:foodlink/main.dart';
 import 'package:foodlink/screens/change_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
@@ -174,7 +175,7 @@ void main() {
     expect(password().obscureText, isTrue);
   });
 
-  testWidgets('Valid sign in shows the not-connected notice', (tester) async {
+  testWidgets('Sign in refuses logins other than the demo', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
     await settle(tester);
 
@@ -186,7 +187,23 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Sign In'));
     await settle(tester, 15);
 
-    expect(find.textContaining("isn't connected yet"), findsOneWidget);
+    expect(find.text('Incorrect email or password'), findsOneWidget);
+    expect(find.byType(RoleScreen), findsNothing);
+  });
+
+  testWidgets('Demo account signs in and opens the role screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
+    await settle(tester);
+
+    await tapVisible(tester, find.bySemanticsLabel('Use demo account'));
+    await settle(tester, 3);
+    expect(find.text(DemoAccount.email), findsOneWidget);
+
+    await tapVisible(tester, find.bySemanticsLabel('Sign In'));
+    await settle(tester, 25);
+    expect(find.byType(RoleScreen), findsOneWidget);
   });
 
   testWidgets('Remember me toggles', (tester) async {

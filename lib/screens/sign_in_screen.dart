@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../auth/demo_account.dart';
 import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
@@ -12,6 +13,7 @@ import '../widgets/auth_widgets.dart';
 import '../widgets/google_logo.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/rise_in.dart';
+import 'role_screen.dart';
 import 'sign_up_screen.dart';
 
 /// Sign In: "Welcome Back".
@@ -20,8 +22,9 @@ import 'sign_up_screen.dart';
 /// card). Fields glow when focused, validate on submit and shake when
 /// something's wrong. "Sign Up" swaps to [SignUpScreen].
 ///
-/// Authentication isn't connected yet (Firebase comes later), so actions that
-/// need it show a clear notice instead of pretending to work.
+/// Real authentication isn't connected yet (Firebase comes later). Until
+/// then the [DemoAccount] login (one tap fills it in) leads on to account
+/// setup ([RoleScreen]); any other valid-looking login is refused.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
@@ -82,9 +85,24 @@ class _SignInScreenState extends State<SignInScreen>
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     setState(() => _loading = false);
-    _notice(
-      "Sign-in isn't connected yet. It will work once Firebase is set up.",
-    );
+    if (!DemoAccount.matches(email, password)) {
+      setState(() => _passwordError = 'Incorrect email or password');
+      HapticFeedback.mediumImpact();
+      _shake.forward(from: 0);
+      return;
+    }
+    Navigator.of(context).push(softRoute(const RoleScreen(), slide: true));
+  }
+
+  /// Fills in the demo login.
+  void _useDemo() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _email.text = DemoAccount.email;
+      _password.text = DemoAccount.password;
+      _emailError = null;
+      _passwordError = null;
+    });
   }
 
   void _notice(String message) => showAuthNotice(context, message);
@@ -142,7 +160,15 @@ class _SignInScreenState extends State<SignInScreen>
               style: TextStyle(fontSize: 16.5 * s, color: AppColors.bodyText),
             ),
           ),
-          f.space(48),
+          f.space(22),
+          RiseIn(
+            progress: f.rise(4),
+            distance: 12 * s,
+            child: Center(
+              child: _DemoAccountPill(scale: s, onTap: _useDemo),
+            ),
+          ),
+          f.space(28),
           Transform.translate(
             offset: Offset(shake, 0),
             child: Column(
@@ -289,6 +315,92 @@ class _SignInScreenState extends State<SignInScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Demo account" pill: shows the demo login and fills it in when tapped.
+class _DemoAccountPill extends StatefulWidget {
+  const _DemoAccountPill({required this.scale, required this.onTap});
+
+  final double scale;
+  final VoidCallback onTap;
+
+  @override
+  State<_DemoAccountPill> createState() => _DemoAccountPillState();
+}
+
+class _DemoAccountPillState extends State<_DemoAccountPill> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.scale;
+    return Semantics(
+      button: true,
+      label: 'Use demo account',
+      excludeSemantics: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: EdgeInsets.fromLTRB(8 * s, 7 * s, 14 * s, 7 * s),
+            decoration: BoxDecoration(
+              color: _hovered
+                  ? AppColors.roleChosenCircle
+                  : AppColors.roleChosenFill,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.roleChosenBorder),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 26 * s,
+                  height: 26 * s,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.brand,
+                  ),
+                  child: Icon(
+                    Icons.key_rounded,
+                    size: 15 * s,
+                    color: AppColors.white,
+                  ),
+                ),
+                SizedBox(width: 9 * s),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Use demo account',
+                        style: TextStyle(
+                          fontSize: 13.5 * s,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.brand,
+                        ),
+                      ),
+                      Text(
+                        '${DemoAccount.email} · ${DemoAccount.password}',
+                        style: TextStyle(
+                          fontSize: 12 * s,
+                          color: AppColors.bodyText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
