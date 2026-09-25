@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:foodlink/auth/demo_account.dart';
 import 'package:foodlink/main.dart';
 import 'package:foodlink/screens/change_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
 import 'package:foodlink/screens/onboarding_screen.dart';
+import 'package:foodlink/screens/role_screen.dart';
 import 'package:foodlink/screens/sign_in_screen.dart';
 import 'package:foodlink/screens/sign_up_screen.dart';
 import 'package:foodlink/widgets/primary_button.dart';
@@ -172,7 +175,7 @@ void main() {
     expect(password().obscureText, isTrue);
   });
 
-  testWidgets('Valid sign in shows the not-connected notice', (tester) async {
+  testWidgets('Sign in refuses logins other than the demo', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
     await settle(tester);
 
@@ -184,7 +187,23 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Sign In'));
     await settle(tester, 15);
 
-    expect(find.textContaining("isn't connected yet"), findsOneWidget);
+    expect(find.text('Incorrect email or password'), findsOneWidget);
+    expect(find.byType(RoleScreen), findsNothing);
+  });
+
+  testWidgets('Demo account signs in and opens the role screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
+    await settle(tester);
+
+    await tapVisible(tester, find.bySemanticsLabel('Use demo account'));
+    await settle(tester, 3);
+    expect(find.text(DemoAccount.email), findsOneWidget);
+
+    await tapVisible(tester, find.bySemanticsLabel('Sign In'));
+    await settle(tester, 25);
+    expect(find.byType(RoleScreen), findsOneWidget);
   });
 
   testWidgets('Remember me toggles', (tester) async {
@@ -249,8 +268,8 @@ void main() {
     await tester.enterText(fields.at(2), '+91 98765 43210');
     await tester.enterText(fields.at(3), 'Harvest#2026');
     await tapVisible(tester, find.byType(PrimaryButton));
-    await settle(tester, 15);
-    expect(find.textContaining("isn't connected yet"), findsOneWidget);
+    await settle(tester, 25);
+    expect(find.byType(RoleScreen), findsOneWidget);
   });
 
   testWidgets('Password strength meter reacts to the password', (tester) async {
@@ -265,5 +284,38 @@ void main() {
     await tester.enterText(password, 'Harvest#2026');
     await settle(tester, 3);
     expect(find.text('Strong'), findsOneWidget);
+  });
+
+  testWidgets('Role screen switches roles and continues', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: RoleScreen()));
+    await settle(tester, 25);
+
+    expect(find.bySemanticsLabel('I am a...'), findsOneWidget);
+    expect(find.bySemanticsLabel('Step 3 of 5'), findsOneWidget);
+    final volunteer = find.bySemanticsLabel(RegExp('^Volunteer'));
+    final coordinator = find.bySemanticsLabel(RegExp('^Coordinator'));
+    // Volunteer is chosen to start, as in the design.
+    expect(tester.getSemantics(volunteer), isSemantics(isSelected: true));
+    expect(tester.getSemantics(coordinator), isSemantics(isSelected: false));
+    expect(find.text('Find food drives near you'), findsOneWidget);
+
+    await tester.tap(coordinator);
+    await settle(tester, 6);
+    expect(tester.getSemantics(coordinator), isSemantics(isSelected: true));
+    expect(tester.getSemantics(volunteer), isSemantics(isSelected: false));
+    expect(find.text('Set up distribution events'), findsOneWidget);
+    expect(find.text('Find food drives near you'), findsNothing);
+
+    // Arrow keys switch back.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await settle(tester, 6);
+    expect(tester.getSemantics(volunteer), isSemantics(isSelected: true));
+
+    await tester.tap(find.bySemanticsLabel('Next'));
+    await settle(tester, 5);
+    expect(
+      find.textContaining("You're joining as a Volunteer"),
+      findsOneWidget,
+    );
   });
 }

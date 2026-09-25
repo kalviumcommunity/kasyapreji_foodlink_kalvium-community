@@ -12,6 +12,7 @@ import '../widgets/auth_widgets.dart';
 import '../widgets/password_strength.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/rise_in.dart';
+import 'role_screen.dart';
 import 'sign_in_screen.dart';
 
 /// Sign Up: "Create Account".
@@ -21,8 +22,8 @@ import 'sign_in_screen.dart';
 /// Conditions box that must be ticked. Everything validates on submit and the
 /// form shakes when something's wrong. "Sign In" swaps to [SignInScreen].
 ///
-/// Account creation isn't connected yet (Firebase comes later), so a valid
-/// submit shows a clear notice instead of pretending to work.
+/// A valid submit moves on to account setup ([RoleScreen]). No account is
+/// actually created yet: that comes with Firebase.
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -113,10 +114,7 @@ class _SignUpScreenState extends State<SignUpScreen>
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     setState(() => _loading = false);
-    showAuthNotice(
-      context,
-      "Account creation isn't connected yet. It will work once Firebase is set up.",
-    );
+    Navigator.of(context).push(softRoute(const RoleScreen(), slide: true));
   }
 
   @override
