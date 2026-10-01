@@ -28,6 +28,7 @@ flutter:
     - assets/images/change_volunteers.jpg
     - assets/images/role_volunteer.jpg
     - assets/images/role_coordinator.jpg
+    - assets/images/notifications_community_farm.jpg
 
   # Fraunces (headings) and Plus Jakarta Sans (body), both SIL OFL 1.1.
   fonts:

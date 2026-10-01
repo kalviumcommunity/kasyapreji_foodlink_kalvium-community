@@ -1,7 +1,8 @@
 # Photo credits
 
-All photos are from [Unsplash](https://unsplash.com) and used under the
-[Unsplash License](https://unsplash.com/license) (free for commercial use).
+Photos are from [Unsplash](https://unsplash.com), used under the
+[Unsplash License](https://unsplash.com/license) (free for commercial use),
+except where the table says otherwise.
 
 | File | Photo | Photographer |
 | --- | --- | --- |
@@ -11,3 +12,4 @@ All photos are from [Unsplash](https://unsplash.com) and used under the
 | `change_volunteers.jpg` | [Group of people standing on brown soil during daytime](https://unsplash.com/photos/group-of-people-standing-on-brown-soil-during-daytime-_1j7_atc0z8) | [OCG Saving The Ocean](https://unsplash.com/@oceancleanupgroup) |
 | `role_volunteer.jpg` | [Man in blue crew neck t-shirt standing beside brown cardboard boxes](https://unsplash.com/photos/tnVdQGmWtb0) | [Ismael Paramo](https://unsplash.com/@ismaelparamo) |
 | `role_coordinator.jpg` | [Woman with clipboard leads park cleanup with volunteers](https://unsplash.com/photos/fTn3_R00Q04) | [Vitaly Gariev](https://unsplash.com/@silverkblack) |
+| `notifications_community_farm.jpg` | [Rivoli Bluffs Farm, Urban Roots, St Paul](https://commons.wikimedia.org/wiki/File:RMA-Urban_Roots_St_Paul-Ag_in_the_city_(20220928-RMA-CDP-0056).jpg) (Wikimedia Commons, public domain) | U.S. Department of Agriculture |

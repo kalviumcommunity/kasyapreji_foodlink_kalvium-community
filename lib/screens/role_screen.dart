@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/auth_widgets.dart';
@@ -14,6 +15,7 @@ import '../widgets/pulse_next_button.dart';
 import '../widgets/rise_in.dart';
 import '../widgets/soft_backdrop.dart';
 import '../widgets/step_dots.dart';
+import 'notifications_screen.dart';
 
 /// How someone will use FoodLink.
 enum UserRole { volunteer, coordinator }
@@ -85,8 +87,7 @@ const _roles = {
 /// Phones follow the Figma frame; laptops get two columns: title, perks and
 /// next button left, larger cards right.
 ///
-/// The next setup step isn't designed yet, so Next confirms the choice with
-/// a notice for now.
+/// Next moves on to [NotificationsScreen].
 class RoleScreen extends StatefulWidget {
   const RoleScreen({super.key});
 
@@ -146,11 +147,8 @@ class _RoleScreenState extends State<RoleScreen> with TickerProviderStateMixin {
   }
 
   void _continue() {
-    showAuthNotice(
-      context,
-      "You're joining as a ${_roles[_role]!.title}. "
-      'The next setup step is coming soon.',
-    );
+    Navigator.of(context)
+        .push(softRoute(const NotificationsScreen(), slide: true));
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -326,35 +324,6 @@ class _RoleScreenState extends State<RoleScreen> with TickerProviderStateMixin {
 
     return Stack(
       children: [
-        // Back button and brand mark, top-left, like a site header.
-        Positioned(
-          top: 32 * s,
-          left: 64 * s,
-          child: RiseIn(
-            progress: _rise(0),
-            distance: -10 * s,
-            child: Row(
-              children: [
-                if (Navigator.of(context).canPop()) ...[
-                  _backButton(s),
-                  SizedBox(width: 18 * s),
-                ],
-                FoodLinkLogo(width: 36 * s),
-                SizedBox(width: 12 * s),
-                Text(
-                  'FoodLink',
-                  style: TextStyle(
-                    fontFamily: AppFonts.display,
-                    fontSize: 24 * s,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3 * s,
-                    color: AppColors.brandDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
         Center(
           child: SingleChildScrollView(
             padding: EdgeInsets.only(top: 100 * s, bottom: 32 * s),
@@ -430,6 +399,37 @@ class _RoleScreenState extends State<RoleScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+        // Back button and brand mark, top-left, like a site header. Drawn
+        // last so the scrolling content never covers the back button.
+        Positioned(
+          top: 32 * s,
+          left: 64 * s,
+          child: RiseIn(
+            progress: _rise(0),
+            distance: -10 * s,
+            child: Row(
+              children: [
+                if (Navigator.of(context).canPop()) ...[
+                  // Its own node, so it isn't read out as "Back FoodLink".
+                  Semantics(container: true, child: _backButton(s)),
+                  SizedBox(width: 18 * s),
+                ],
+                FoodLinkLogo(width: 36 * s),
+                SizedBox(width: 12 * s),
+                Text(
+                  'FoodLink',
+                  style: TextStyle(
+                    fontFamily: AppFonts.display,
+                    fontSize: 24 * s,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3 * s,
+                    color: AppColors.brandDark,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
