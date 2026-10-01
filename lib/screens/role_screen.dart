@@ -148,7 +148,7 @@ class _RoleScreenState extends State<RoleScreen> with TickerProviderStateMixin {
 
   void _continue() {
     Navigator.of(context)
-        .push(softRoute(const NotificationsScreen(), slide: true));
+        .push(softRoute(NotificationsScreen(role: _role), slide: true));
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {

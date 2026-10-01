@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/asset_photo.dart';
@@ -16,6 +17,8 @@ import '../widgets/primary_button.dart';
 import '../widgets/rise_in.dart';
 import '../widgets/soft_backdrop.dart';
 import '../widgets/step_dots.dart';
+import 'role_screen.dart';
+import 'volunteer_home_screen.dart';
 
 /// What FoodLink sends notifications about: icon, name, one-line detail.
 const _topics = [
@@ -48,10 +51,15 @@ const _previews = [
 /// Phones follow the Figma frame; laptops get two columns: title, topics and
 /// buttons left, the bell and sample notifications over the photo right.
 ///
-/// The device's own permission prompt and the next setup step aren't wired
-/// up yet, so both buttons confirm with a notice for now.
+/// Maybe Later (Continue, once allowed) opens the home for the chosen
+/// [role]: volunteers go to [VolunteerHomeScreen]; the coordinator's home
+/// isn't designed yet, so coordinators get a notice for now. The device's own
+/// permission prompt isn't wired up yet either.
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, this.role = UserRole.volunteer});
+
+  /// The role chosen on the previous step.
+  final UserRole role;
 
   static const int stepCount = 5;
   static const int step = 3;
@@ -118,19 +126,16 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       _busy = false;
       _allowed = true;
     });
-    showAuthNotice(
-      context,
-      "You're in the loop! The next setup step is coming soon.",
-    );
+    showAuthNotice(context, "You're in the loop! Notifications are on.");
   }
 
   void _later() {
-    showAuthNotice(
-      context,
-      _allowed
-          ? 'The next setup step is coming soon.'
-          : 'No problem. You can turn notifications on anytime in Settings.',
-    );
+    if (widget.role == UserRole.volunteer) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      Navigator.of(context).push(softRoute(const VolunteerHomeScreen()));
+      return;
+    }
+    showAuthNotice(context, 'The coordinator home is coming soon.');
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
