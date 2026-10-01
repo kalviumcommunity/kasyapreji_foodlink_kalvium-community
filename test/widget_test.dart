@@ -6,6 +6,7 @@ import 'package:foodlink/auth/demo_account.dart';
 import 'package:foodlink/main.dart';
 import 'package:foodlink/screens/change_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
+import 'package:foodlink/screens/notifications_screen.dart';
 import 'package:foodlink/screens/onboarding_screen.dart';
 import 'package:foodlink/screens/role_screen.dart';
 import 'package:foodlink/screens/sign_in_screen.dart';
@@ -312,10 +313,47 @@ void main() {
     expect(tester.getSemantics(volunteer), isSemantics(isSelected: true));
 
     await tester.tap(find.bySemanticsLabel('Next'));
+    await settle(tester, 15);
+    expect(find.byType(NotificationsScreen), findsOneWidget);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
+  });
+
+  testWidgets('Notifications screen allows notifications', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: NotificationsScreen()));
+    await settle(tester, 25);
+
+    expect(find.bySemanticsLabel('Stay in the Loop'), findsOneWidget);
+    expect(find.bySemanticsLabel('Step 4 of 5'), findsOneWidget);
+    expect(find.bySemanticsLabel('Notification bell'), findsOneWidget);
+    expect(find.text('Maybe Later'), findsOneWidget);
+
+    await tapVisible(tester, find.bySemanticsLabel('Allow Notifications'));
+    await settle(tester, 15);
+    expect(find.text('Notifications On'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
+    expect(find.bySemanticsLabel('Notifications on'), findsOneWidget);
+    expect(find.textContaining("You're in the loop"), findsOneWidget);
+  });
+
+  testWidgets('Maybe Later skips notifications', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: NotificationsScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.bySemanticsLabel('Maybe Later'));
     await settle(tester, 5);
-    expect(
-      find.textContaining("You're joining as a Volunteer"),
-      findsOneWidget,
-    );
+    expect(find.textContaining('anytime in Settings'), findsWidgets);
+    expect(find.text('Allow Notifications'), findsOneWidget);
+  });
+
+  testWidgets('Notifications screen fits a phone', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: NotificationsScreen()));
+    await settle(tester, 25);
+
+    expect(find.text('New events'), findsOneWidget);
+    expect(find.text('Impact stories'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

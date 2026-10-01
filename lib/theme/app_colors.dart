@@ -98,6 +98,10 @@ class AppColors {
   static const Color stepDone = Color(0xFFC9DDC8);
   static const Color stepTodo = Color(0xFFE4ECE3);
 
+  /// Unread dot on the notification bell, and the pale ring round it.
+  static const Color badge = Color(0xFFDC6558);
+  static const Color badgeRing = Color(0xFFF5CFCA);
+
   // Splash effects
   static const Color glow = Color(0xFFDCEBD5);
   static const Color particle = Color(0xFFF4F9E8);
