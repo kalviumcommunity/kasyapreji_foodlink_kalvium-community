@@ -102,6 +102,9 @@ class AppColors {
   static const Color badge = Color(0xFFDC6558);
   static const Color badgeRing = Color(0xFFF5CFCA);
 
+  /// Warm amber for the waving hand on the home greeting.
+  static const Color sun = Color(0xFFE0A63A);
+
   // Splash effects
   static const Color glow = Color(0xFFDCEBD5);
   static const Color particle = Color(0xFFF4F9E8);

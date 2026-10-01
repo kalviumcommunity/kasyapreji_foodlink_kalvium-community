@@ -11,6 +11,7 @@ import 'package:foodlink/screens/onboarding_screen.dart';
 import 'package:foodlink/screens/role_screen.dart';
 import 'package:foodlink/screens/sign_in_screen.dart';
 import 'package:foodlink/screens/sign_up_screen.dart';
+import 'package:foodlink/screens/volunteer_home_screen.dart';
 import 'package:foodlink/widgets/primary_button.dart';
 
 void main() {
@@ -333,6 +334,7 @@ void main() {
     expect(find.text('Continue'), findsOneWidget);
     expect(find.bySemanticsLabel('Notifications on'), findsOneWidget);
     expect(find.textContaining("You're in the loop"), findsOneWidget);
+    expect(find.byType(VolunteerHomeScreen), findsNothing);
   });
 
   testWidgets('Maybe Later skips notifications', (tester) async {
@@ -340,9 +342,74 @@ void main() {
     await settle(tester, 25);
 
     await tapVisible(tester, find.bySemanticsLabel('Maybe Later'));
+    await settle(tester, 30);
+    expect(find.byType(VolunteerHomeScreen), findsOneWidget);
+  });
+
+  testWidgets('Continue after allowing opens the volunteer home', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: NotificationsScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.bySemanticsLabel('Allow Notifications'));
+    await settle(tester, 15);
+    await tapVisible(tester, find.bySemanticsLabel('Continue'));
+    await settle(tester, 30);
+    expect(find.byType(VolunteerHomeScreen), findsOneWidget);
+  });
+
+  testWidgets('Coordinators do not get the volunteer home', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: RoleScreen()));
+    await settle(tester, 25);
+
+    await tester.tap(find.bySemanticsLabel(RegExp('^Coordinator')));
+    await settle(tester, 6);
+    await tester.tap(find.bySemanticsLabel('Next'));
+    await settle(tester, 30);
+    await tapVisible(tester, find.bySemanticsLabel('Maybe Later'));
+    await settle(tester, 15);
+
+    expect(find.byType(VolunteerHomeScreen), findsNothing);
+    expect(find.text('The coordinator home is coming soon.'), findsOneWidget);
+  });
+
+  testWidgets('Volunteer home shows greeting, numbers and events', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+
+    expect(find.text('Agnibha!'), findsOneWidget);
+    expect(find.textContaining('Good '), findsOneWidget);
+    expect(find.bySemanticsLabel('12 Events'), findsOneWidget);
+    expect(find.bySemanticsLabel('36 Hours'), findsOneWidget);
+    expect(find.bySemanticsLabel('5 Communities'), findsOneWidget);
+    expect(find.text('Upcoming Events'), findsOneWidget);
+    expect(find.text('Community Food Drive'), findsOneWidget);
+    expect(find.text('Riverside Center'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Home tab')),
+      isSemantics(isSelected: true),
+    );
+
+    await tapVisible(tester, find.bySemanticsLabel('Explore tab'));
     await settle(tester, 5);
-    expect(find.textContaining('anytime in Settings'), findsWidgets);
-    expect(find.text('Allow Notifications'), findsOneWidget);
+    expect(find.text('Explore is coming soon.'), findsOneWidget);
+  });
+
+  testWidgets('Volunteer home fits a phone', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+
+    for (final tab in ['Home', 'Explore', 'Community', 'Profile']) {
+      expect(find.text(tab), findsOneWidget);
+    }
+    expect(find.text('12'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Notifications screen fits a phone', (tester) async {
