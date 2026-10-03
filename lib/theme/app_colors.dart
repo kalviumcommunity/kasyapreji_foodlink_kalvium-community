@@ -111,6 +111,13 @@ class AppColors {
   static const Color tagFoodText = Color(0xFF8A5A1E);
   static const Color tagLearnFill = Color(0xFFE1ECF4);
   static const Color tagLearnText = Color(0xFF3D6683);
+  static const Color glowSky = Color(0xFFD3E4F1);
+
+  // Painted map on the event details page.
+  static const Color mapLand = Color(0xFFEEF2E8);
+  static const Color mapBlock = Color(0xFFE2E9DA);
+  static const Color mapPark = Color(0xFFD2E5C4);
+  static const Color mapWater = Color(0xFFCFE1EC);
 
   // Splash effects
   static const Color glow = Color(0xFFDCEBD5);

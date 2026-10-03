@@ -10,21 +10,24 @@ enum EventCategory {
     Icons.volunteer_activism_rounded,
     AppColors.tagFoodFill,
     AppColors.tagFoodText,
+    AppColors.glowPeach,
   ),
   community(
     'Community',
     Icons.diversity_3_rounded,
     AppColors.roleChosenFill,
     AppColors.brand,
+    AppColors.glowMint,
   ),
   education(
     'Education',
     Icons.menu_book_rounded,
     AppColors.tagLearnFill,
     AppColors.tagLearnText,
+    AppColors.glowSky,
   );
 
-  const EventCategory(this.label, this.icon, this.fill, this.text);
+  const EventCategory(this.label, this.icon, this.fill, this.text, this.glow);
 
   final String label;
   final IconData icon;
@@ -32,6 +35,9 @@ enum EventCategory {
   /// Tag background and text colours.
   final Color fill;
   final Color text;
+
+  /// Soft colour glowing behind the event's details.
+  final Color glow;
 }
 
 /// One volunteering event.
