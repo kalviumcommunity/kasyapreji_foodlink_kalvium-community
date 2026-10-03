@@ -1,70 +1,27 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/sample_events.dart';
+import '../navigation/tab_navigation.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
+import '../widgets/app_nav.dart';
 import '../widgets/asset_photo.dart';
 import '../widgets/auth_widgets.dart';
-import '../widgets/foodlink_logo.dart';
-import '../widgets/leaf.dart';
-import '../widgets/light_particles.dart';
+import '../widgets/event_tile.dart';
 import '../widgets/onboarding_layout.dart';
+import '../widgets/page_scene.dart';
 import '../widgets/rise_in.dart';
 import '../widgets/soft_backdrop.dart';
-
-/// One upcoming event in the list.
-class _Event {
-  const _Event(this.title, this.when, this.place, this.photo, this.focus);
-
-  final String title;
-  final String when;
-  final String place;
-  final String photo;
-  final Alignment focus;
-}
-
-/// Sample events, until events come from the database.
-const _events = [
-  _Event(
-    'Community Food Drive',
-    'Sat, 20 Sep · 10:00 AM',
-    'Riverside Center',
-    'assets/images/role_volunteer.jpg',
-    Alignment(0.1, -0.3),
-  ),
-  _Event(
-    'Weekend Meal Packing',
-    'Sun, 21 Sep · 9:00 AM',
-    'Hope Kitchen',
-    'assets/images/impact_packing.jpg',
-    Alignment.center,
-  ),
-  _Event(
-    'Neighbourhood Share Day',
-    'Sat, 27 Sep · 4:00 PM',
-    'Green Park',
-    'assets/images/change_volunteers.jpg',
-    Alignment.center,
-  ),
-];
+import 'explore_screen.dart';
 
 /// The volunteer's numbers: value, label, icon. Sample values for now.
 const _stats = [
   (12, 'Events', Icons.event_available_rounded),
   (36, 'Hours', Icons.schedule_rounded),
   (5, 'Communities', Icons.groups_rounded),
-];
-
-/// The app's main sections. Only Home exists so far.
-const _tabs = [
-  ('Home', Icons.home_rounded),
-  ('Explore', Icons.search_rounded),
-  ('Events', Icons.calendar_today_rounded),
-  ('Community', Icons.sentiment_satisfied_alt_rounded),
-  ('Profile', Icons.person_outline_rounded),
 ];
 
 /// Volunteer home: greeting, a quote, the volunteer's numbers and upcoming
@@ -76,8 +33,9 @@ const _tabs = [
 /// Phones follow the Figma frame with a bottom navigation bar; laptops get a
 /// side navigation rail and the events as a grid of photo cards.
 ///
-/// The other sections and event details aren't designed yet, so they answer
-/// with a notice for now. [name] and the numbers are sample values until
+/// The Explore tab and "View All" open [ExploreScreen]. The other sections
+/// and event details aren't designed yet, so they answer with a notice for
+/// now. [name] and the numbers are sample values until
 /// accounts exist.
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key, this.name = 'Agnibha'});
@@ -126,7 +84,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     _photo.resolve(context, () {
       if (mounted) setState(() {});
     });
-    for (final event in _events) {
+    for (final event in upcomingEvents) {
       precacheImage(AssetImage(event.photo), context);
     }
   }
@@ -139,11 +97,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     super.dispose();
   }
 
-  void _openTab(int index) {
-    if (index == 0) return;
-    HapticFeedback.selectionClick();
-    showAuthNotice(context, '${_tabs[index].$1} is coming soon.');
-  }
+  void _openTab(AppTab tab) => openAppTab(context, AppTab.home, tab);
 
   void _soon(String what) => showAuthNotice(context, '$what coming soon.');
 
@@ -192,7 +146,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                   Positioned.fill(
                     child: IgnorePointer(
                       child: CustomPaint(
-                        painter: _ScenePainter(
+                        painter: PageScenePainter(
                           photo: _photo.image,
                           time: _ambient.value,
                           reveal: _rise(0),
@@ -269,13 +223,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                         ),
                         SizedBox(height: 14 * s),
                         Container(height: 1, color: AppColors.fieldBorder),
-                        for (final (i, event) in _events.indexed)
+                        for (final (i, event) in upcomingEvents.indexed)
                           Padding(
                             padding: EdgeInsets.only(top: 18 * s),
                             child: RiseIn(
                               progress: _rise(7 + i),
                               distance: 20 * s,
-                              child: _EventTile(
+                              child: EventTile(
                                 event: event,
                                 scale: s,
                                 card: false,
@@ -291,45 +245,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             ),
           ),
         ),
-        _bottomBar(s),
+        AppBottomBar(current: AppTab.home, scale: s, onSelect: _openTab),
       ],
-    );
-  }
-
-  Widget _bottomBar(double s) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.96),
-        border: const Border(top: BorderSide(color: AppColors.fieldBorder)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brand.withValues(alpha: 0.06),
-            blurRadius: 18 * s,
-            offset: Offset(0, -4 * s),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(6 * s, 8 * s, 6 * s, 8 * s),
-          child: Row(
-            children: [
-              for (final (i, (label, icon)) in _tabs.indexed)
-                Expanded(
-                  child: _NavItem(
-                    label: label,
-                    icon: icon,
-                    selected: i == 0,
-                    scale: s,
-                    rail: false,
-                    onTap: () => _openTab(i),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -347,7 +264,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
 
     return Row(
       children: [
-        SizedBox(width: railWidth, child: _rail(s)),
+        SizedBox(
+          width: railWidth,
+          child: AppSideRail(
+            current: AppTab.home,
+            scale: s,
+            onSelect: _openTab,
+          ),
+        ),
         Expanded(
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(vertical: 30 * s),
@@ -416,13 +340,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                         spacing: gap,
                         runSpacing: gap,
                         children: [
-                          for (final (i, event) in _events.indexed)
+                          for (final (i, event) in upcomingEvents.indexed)
                             SizedBox(
                               width: cardWidth,
                               child: RiseIn(
                                 progress: _rise(7 + i),
                                 distance: 24 * s,
-                                child: _EventTile(
+                                child: EventTile(
                                   event: event,
                                   scale: s,
                                   card: true,
@@ -440,67 +364,6 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           ),
         ),
       ],
-    );
-  }
-
-  /// Laptops: brand mark and the sections down the left side.
-  Widget _rail(double s) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.72),
-        border: const Border(right: BorderSide(color: AppColors.fieldBorder)),
-      ),
-      padding: EdgeInsets.fromLTRB(16 * s, 30 * s, 16 * s, 20 * s),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: 10 * s),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Row(
-                children: [
-                  FoodLinkLogo(width: 34 * s),
-                  SizedBox(width: 10 * s),
-                  Text(
-                    'FoodLink',
-                    style: TextStyle(
-                      fontFamily: AppFonts.display,
-                      fontSize: 23 * s,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3 * s,
-                      color: AppColors.brandDark,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: 30 * s),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final (i, (label, icon)) in _tabs.indexed)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 6 * s),
-                      child: _NavItem(
-                        label: label,
-                        icon: icon,
-                        selected: i == 0,
-                        scale: s,
-                        rail: true,
-                        onTap: () => _openTab(i),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -634,7 +497,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           label: 'View All',
           scale: s,
           fontSize: 17,
-          onTap: () => _soon('The full events list is'),
+          onTap: () => openAppTab(context, AppTab.home, AppTab.explore),
         ),
       ],
     );
@@ -844,364 +707,4 @@ class _StatTile extends StatelessWidget {
       ),
     );
   }
-}
-
-/// An upcoming event: a row with a square photo (phones), or a [card] with
-/// the photo on top (laptops). Lifts on hover and dips when pressed.
-class _EventTile extends StatefulWidget {
-  const _EventTile({
-    required this.event,
-    required this.scale,
-    required this.card,
-    required this.onTap,
-  });
-
-  final _Event event;
-  final double scale;
-  final bool card;
-  final VoidCallback onTap;
-
-  @override
-  State<_EventTile> createState() => _EventTileState();
-}
-
-class _EventTileState extends State<_EventTile> {
-  bool _hovered = false;
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = widget.scale;
-    final event = widget.event;
-    final card = widget.card;
-
-    Widget photo(double radius) => ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: AnimatedScale(
-        scale: _hovered ? 1.06 : 1,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOutCubic,
-        child: Image.asset(
-          event.photo,
-          fit: BoxFit.cover,
-          alignment: event.focus,
-          errorBuilder: (_, _, _) => const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [AppColors.earthLight, AppColors.brand],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final details = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          event.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 17 * s,
-            fontWeight: FontWeight.w700,
-            color: AppColors.ink,
-          ),
-        ),
-        SizedBox(height: 9 * s),
-        for (final (icon, text) in [
-          (Icons.schedule_rounded, event.when),
-          (Icons.place_outlined, event.place),
-        ])
-          Padding(
-            padding: EdgeInsets.only(bottom: 6 * s),
-            child: Row(
-              children: [
-                Icon(icon, size: 15 * s, color: AppColors.leafLight),
-                SizedBox(width: 6 * s),
-                Expanded(
-                  child: Text(
-                    text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14.5 * s,
-                      color: AppColors.bodyText,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-
-    return Semantics(
-      button: true,
-      label: '${event.title}. ${event.when}. ${event.place}',
-      excludeSemantics: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapCancel: () => setState(() => _pressed = false),
-          onTapUp: (_) {
-            setState(() => _pressed = false);
-            widget.onTap();
-          },
-          child: AnimatedScale(
-            scale: _pressed ? 0.98 : 1,
-            duration: const Duration(milliseconds: 120),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              transform: Matrix4.translationValues(0, _hovered ? -4 * s : 0, 0),
-              padding: card ? EdgeInsets.all(10 * s) : EdgeInsets.zero,
-              decoration: card
-                  ? BoxDecoration(
-                      color: AppColors.white.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(24 * s),
-                      border: Border.all(
-                        color: AppColors.white.withValues(alpha: 0.9),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.brand.withValues(
-                            alpha: _hovered ? 0.14 : 0.06,
-                          ),
-                          blurRadius: 26 * s,
-                          offset: Offset(0, 10 * s),
-                        ),
-                      ],
-                    )
-                  : null,
-              child: card
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AspectRatio(aspectRatio: 16 / 10, child: photo(16 * s)),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            8 * s,
-                            14 * s,
-                            8 * s,
-                            4 * s,
-                          ),
-                          child: details,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        SizedBox.square(
-                          dimension: 108 * s,
-                          child: photo(20 * s),
-                        ),
-                        SizedBox(width: 20 * s),
-                        Expanded(child: details),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// One section in the navigation: icon over label in the phone's bottom bar,
-/// or icon beside label in the laptop's side [rail].
-class _NavItem extends StatefulWidget {
-  const _NavItem({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.scale,
-    required this.rail,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final double scale;
-  final bool rail;
-  final VoidCallback onTap;
-
-  @override
-  State<_NavItem> createState() => _NavItemState();
-}
-
-class _NavItemState extends State<_NavItem> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = widget.scale;
-    final selected = widget.selected;
-    final color = selected ? AppColors.brand : AppColors.fieldIcon;
-    final icon = Icon(
-      widget.icon,
-      size: (widget.rail ? 21 : 25) * s,
-      color: color,
-    );
-    final label = Text(
-      widget.label,
-      maxLines: 1,
-      style: TextStyle(
-        fontSize: (widget.rail ? 15 : 12) * s,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        color: color,
-      ),
-    );
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '${widget.label} tab',
-      excludeSemantics: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: widget.rail
-                ? EdgeInsets.symmetric(horizontal: 14 * s, vertical: 12 * s)
-                : EdgeInsets.symmetric(vertical: 5 * s),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14 * s),
-              color: selected && widget.rail
-                  ? AppColors.roleChosenFill
-                  : _hovered
-                  ? AppColors.socialFill.withValues(alpha: 0.7)
-                  : AppColors.white.withValues(alpha: 0),
-            ),
-            child: widget.rail
-                ? Row(
-                    children: [
-                      icon,
-                      SizedBox(width: 12 * s),
-                      Expanded(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: label,
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      icon,
-                      SizedBox(height: 4 * s),
-                      FittedBox(fit: BoxFit.scaleDown, child: label),
-                    ],
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-const _leaf = LeafShape(
-  tipA: Offset(52, 6),
-  tipB: Offset(14, 70),
-  bulgeLeft: 14,
-  bulgeRight: 12,
-  color: AppColors.onboardingLeaf,
-  veinColor: AppColors.leafVein,
-);
-
-/// The photo washed into the top of the page (right of the side rail on
-/// laptops), with green specks drifting up and a leaf swaying in the corner.
-class _ScenePainter extends CustomPainter {
-  _ScenePainter({
-    required this.photo,
-    required this.time,
-    required this.reveal,
-    required this.appear,
-    required this.left,
-    required this.scale,
-  });
-
-  final ui.Image? photo;
-  final double time;
-  final double reveal;
-  final double appear;
-
-  /// Where the photo starts from the left (the side rail's width).
-  final double left;
-  final double scale;
-
-  static final _specks = LightParticles(
-    top: 60,
-    bottom: 900,
-    count: 14,
-    seed: 31,
-    color: AppColors.leafLight,
-  );
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = scale;
-    final image = photo;
-    if (image != null && reveal > 0) {
-      final rect = Rect.fromLTRB(left, 0, size.width, 330 * s);
-      canvas.saveLayer(rect, Paint());
-      // Pale, so the dark greeting stays easy to read on top.
-      paintPhotoCover(
-        canvas,
-        image,
-        rect,
-        alignment: const Alignment(0, -0.2),
-        zoom: 1.05 + 0.04 * math.sin(time * 2 * math.pi),
-        opacity: 0.32 * reveal,
-      );
-      canvas.drawRect(
-        rect.inflate(2),
-        Paint()
-          ..blendMode = BlendMode.dstIn
-          ..shader = ui.Gradient.linear(
-            Offset(rect.center.dx, rect.top + rect.height * 0.2),
-            rect.bottomCenter,
-            const [Color(0xFF000000), Color(0x00000000)],
-          ),
-      );
-      canvas.restore();
-    }
-
-    _specks.paint(
-      canvas,
-      sx: size.width / OnboardingLayout.designWidth,
-      sy: size.height / OnboardingLayout.designHeight,
-      time: time,
-      opacity: 0.5 * appear,
-    );
-
-    paintSwayingLeaf(
-      canvas,
-      _leaf,
-      target: Offset(size.width - 34 * s, 124 * s),
-      scale: s * 0.75,
-      time: time,
-      appear: appear,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ScenePainter oldDelegate) => true;
 }

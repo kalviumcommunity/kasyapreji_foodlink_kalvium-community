@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:foodlink/auth/demo_account.dart';
 import 'package:foodlink/main.dart';
 import 'package:foodlink/screens/change_screen.dart';
+import 'package:foodlink/screens/explore_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
 import 'package:foodlink/screens/notifications_screen.dart';
 import 'package:foodlink/screens/onboarding_screen.dart';
@@ -393,9 +394,118 @@ void main() {
       isSemantics(isSelected: true),
     );
 
-    await tapVisible(tester, find.bySemanticsLabel('Explore tab'));
+    await tapVisible(tester, find.bySemanticsLabel('Events tab'));
     await settle(tester, 5);
-    expect(find.text('Explore is coming soon.'), findsOneWidget);
+    expect(find.text('Events is coming soon.'), findsOneWidget);
+  });
+
+  testWidgets('Explore tab opens Explore, and Home comes back', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.bySemanticsLabel('Explore tab'));
+    await settle(tester, 25);
+    expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Explore tab')),
+      isSemantics(isSelected: true),
+    );
+
+    await tapVisible(tester, find.bySemanticsLabel('Home tab'));
+    await settle(tester, 15);
+    expect(find.byType(ExploreScreen), findsNothing);
+    expect(find.byType(VolunteerHomeScreen), findsOneWidget);
+  });
+
+  testWidgets('View All on the home opens Explore; Back returns', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.bySemanticsLabel('View All'));
+    await settle(tester, 25);
+    expect(find.byType(ExploreScreen), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await settle(tester, 15);
+    expect(find.byType(ExploreScreen), findsNothing);
+  });
+
+  testWidgets('Explore filters by category', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ExploreScreen()));
+    await settle(tester, 25);
+
+    expect(find.bySemanticsLabel('Explore'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('All filter')),
+      isSemantics(isSelected: true),
+    );
+    expect(find.text('Community Food Drive'), findsOneWidget);
+    expect(find.text('Urban Garden Setup'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Education filter'));
+    await settle(tester, 6);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Education filter')),
+      isSemantics(isSelected: true),
+    );
+    expect(find.text('Healthy Eating Workshop'), findsOneWidget);
+    expect(find.text('Community Food Drive'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('All filter'));
+    await settle(tester, 6);
+    expect(find.text('Community Food Drive'), findsOneWidget);
+  });
+
+  testWidgets('Explore search narrows the list and can be cleared', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ExploreScreen()));
+    await settle(tester, 25);
+
+    await tester.enterText(find.byType(TextField), 'riverside');
+    await settle(tester, 6);
+    expect(find.text('Community Food Drive'), findsOneWidget);
+    expect(find.text('Food Safety Basics'), findsOneWidget);
+    expect(find.text('Urban Garden Setup'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'zzz');
+    await settle(tester, 6);
+    expect(find.text('No events found'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Clear filters'));
+    await settle(tester, 6);
+    expect(find.text('No events found'), findsNothing);
+    expect(find.text('Urban Garden Setup'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      isEmpty,
+    );
+  });
+
+  testWidgets('Explore fits a phone', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: ExploreScreen()));
+    await settle(tester, 25);
+
+    expect(find.text('Search events, locations...'), findsOneWidget);
+    expect(find.text('Weekend Meal Distribution'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Explore fits a laptop', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: ExploreScreen()));
+    await settle(tester, 25);
+
+    expect(find.text('FoodLink'), findsOneWidget);
+    expect(find.text('7 events'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Volunteer home fits a phone', (tester) async {
