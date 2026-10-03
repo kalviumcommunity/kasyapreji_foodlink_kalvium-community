@@ -15,6 +15,7 @@ import '../widgets/onboarding_layout.dart';
 import '../widgets/page_scene.dart';
 import '../widgets/rise_in.dart';
 import '../widgets/soft_backdrop.dart';
+import 'event_details_screen.dart';
 import 'explore_screen.dart';
 
 /// The volunteer's numbers: value, label, icon. Sample values for now.
@@ -33,14 +34,16 @@ const _stats = [
 /// Phones follow the Figma frame with a bottom navigation bar; laptops get a
 /// side navigation rail and the events as a grid of photo cards.
 ///
-/// The Explore tab and "View All" open [ExploreScreen]. The other sections
-/// and event details aren't designed yet, so they answer with a notice for
-/// now. [name] and the numbers are sample values until
+/// The Explore tab and "View All" open [ExploreScreen], and each event opens
+/// its [EventDetailsScreen]. The other sections aren't designed yet, so they
+/// answer with a notice for now. [name] and the numbers are sample values until
 /// accounts exist.
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key, this.name = 'Agnibha'});
 
   final String name;
+
+  static const String routeName = 'volunteer-home';
 
   static const String photo = 'assets/images/onboarding_community_meal.jpg';
   static const String quotePhoto = 'assets/images/splash_giving.jpg';
@@ -99,7 +102,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
 
   void _openTab(AppTab tab) => openAppTab(context, AppTab.home, tab);
 
-  void _soon(String what) => showAuthNotice(context, '$what coming soon.');
+  void _openEvent(VolunteerEvent event) => openEventDetails(
+    context,
+    event,
+    from: AppTab.home,
+    heroTag: _heroTag(event),
+  );
+
+  static Object _heroTag(VolunteerEvent event) => 'home/${event.title}';
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +243,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                                 event: event,
                                 scale: s,
                                 card: false,
-                                onTap: () => _soon('Event details are'),
+                                onTap: () => _openEvent(event),
+                                heroTag: _heroTag(event),
                               ),
                             ),
                           ),
@@ -350,7 +361,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                                   event: event,
                                   scale: s,
                                   card: true,
-                                  onTap: () => _soon('Event details are'),
+                                  onTap: () => _openEvent(event),
+                                  heroTag: _heroTag(event),
                                 ),
                               ),
                             ),

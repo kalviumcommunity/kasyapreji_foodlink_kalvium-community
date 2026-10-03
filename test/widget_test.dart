@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:foodlink/auth/demo_account.dart';
+import 'package:foodlink/data/event_plans.dart';
+import 'package:foodlink/data/sample_events.dart';
 import 'package:foodlink/main.dart';
 import 'package:foodlink/screens/change_screen.dart';
+import 'package:foodlink/screens/event_details_screen.dart';
 import 'package:foodlink/screens/explore_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
 import 'package:foodlink/screens/notifications_screen.dart';
@@ -16,6 +19,8 @@ import 'package:foodlink/screens/volunteer_home_screen.dart';
 import 'package:foodlink/widgets/primary_button.dart';
 
 void main() {
+  setUp(EventPlans.reset);
+
   testWidgets('Splash screen shows brand name and taglines', (tester) async {
     await tester.pumpWidget(const FoodLinkApp());
 
@@ -506,6 +511,122 @@ void main() {
     expect(find.text('FoodLink'), findsOneWidget);
     expect(find.text('7 events'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Tapping an event in Explore opens its details', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ExploreScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.text('Urban Garden Setup'));
+    await settle(tester, 25);
+    expect(find.byType(EventDetailsScreen), findsOneWidget);
+    expect(find.text('Sun, 28 Sep 2026'), findsOneWidget);
+    expect(find.text('Greenfield Park, Salt Lake'), findsOneWidget);
+    expect(find.bySemanticsLabel('30 Beds'), findsOneWidget);
+    expect(find.bySemanticsLabel('Join Event'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await settle(tester, 15);
+    expect(find.byType(EventDetailsScreen), findsNothing);
+    expect(find.byType(ExploreScreen), findsOneWidget);
+  });
+
+  testWidgets('Events on the home open their details', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.text('Weekend Meal Packing'));
+    await settle(tester, 25);
+    expect(find.byType(EventDetailsScreen), findsOneWidget);
+    expect(find.text('Hope Kitchen, Kolkata'), findsOneWidget);
+  });
+
+  testWidgets('Joining an event counts you in, and you can leave', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: EventDetailsScreen(event: sampleEvents.first)),
+    );
+    await settle(tester, 25);
+
+    expect(find.bySemanticsLabel('50 Volunteers'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('^50 of 60 spots')), findsOneWidget);
+
+    await tapVisible(tester, find.bySemanticsLabel('Join Event'));
+    await settle(tester, 15);
+    expect(find.text("You're Going"), findsOneWidget);
+    expect(find.bySemanticsLabel('51 Volunteers'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('^51 of 60 spots')), findsOneWidget);
+    expect(EventPlans.hasJoined('Community Food Drive'), isTrue);
+
+    await tapVisible(tester, find.bySemanticsLabel('Leave event'));
+    await settle(tester, 15);
+    expect(find.bySemanticsLabel('Join Event'), findsOneWidget);
+    expect(find.bySemanticsLabel('50 Volunteers'), findsOneWidget);
+    expect(EventPlans.hasJoined('Community Food Drive'), isFalse);
+  });
+
+  testWidgets('The heart saves an event', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: EventDetailsScreen(event: sampleEvents.first)),
+    );
+    await settle(tester, 25);
+
+    await tester.tap(find.bySemanticsLabel('Save event'));
+    await settle(tester, 5);
+    expect(EventPlans.hasSaved('Community Food Drive'), isTrue);
+    expect(find.bySemanticsLabel('Remove from saved'), findsOneWidget);
+  });
+
+  testWidgets('Event details fit a phone, for every event', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    for (final event in sampleEvents) {
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey(event.title),
+          home: EventDetailsScreen(event: event),
+        ),
+      );
+      await settle(tester, 25);
+      expect(find.text(event.title), findsWidgets);
+      expect(find.text('What to bring'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // Scroll to the end: the title bar takes over from the photo.
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -900),
+      );
+      await settle(tester, 10);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('Event details fit a laptop, and Home leaves them', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.bySemanticsLabel('Explore tab'));
+    await settle(tester, 25);
+    await tapVisible(tester, find.text('Food Safety Basics'));
+    await settle(tester, 25);
+    expect(find.byType(EventDetailsScreen), findsOneWidget);
+    expect(find.text('Organised by'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tapVisible(tester, find.bySemanticsLabel('Home tab'));
+    await settle(tester, 25);
+    expect(find.byType(EventDetailsScreen), findsNothing);
+    expect(find.byType(ExploreScreen), findsNothing);
+    expect(find.byType(VolunteerHomeScreen), findsOneWidget);
   });
 
   testWidgets('Volunteer home fits a phone', (tester) async {

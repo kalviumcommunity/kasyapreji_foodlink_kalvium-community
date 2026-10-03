@@ -132,7 +132,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void _later() {
     if (widget.role == UserRole.volunteer) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      Navigator.of(context).push(softRoute(const VolunteerHomeScreen()));
+      Navigator.of(context).push(
+        softRoute(
+          const VolunteerHomeScreen(),
+          name: VolunteerHomeScreen.routeName,
+        ),
+      );
       return;
     }
     showAuthNotice(context, 'The coordinator home is coming soon.');
