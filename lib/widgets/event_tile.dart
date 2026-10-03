@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../data/event_plans.dart';
 import '../data/sample_events.dart';
 import '../theme/app_colors.dart';
 
 /// An event: a row with a square photo (phones), or a [card] with
-/// the photo on top (laptops). Lifts on hover and dips when pressed.
+/// the photo on top (laptops). Lifts on hover and dips when pressed, and
+/// shows a green check on the photo once the volunteer has joined.
+///
+/// The photo is a [Hero] tagged [heroTag], so it grows into the details
+/// page when the tile is opened.
 class EventTile extends StatefulWidget {
   const EventTile({
     super.key,
@@ -12,12 +17,14 @@ class EventTile extends StatefulWidget {
     required this.scale,
     required this.card,
     required this.onTap,
+    required this.heroTag,
   });
 
   final VolunteerEvent event;
   final double scale;
   final bool card;
   final VoidCallback onTap;
+  final Object heroTag;
 
   @override
   State<EventTile> createState() => _EventTileState();
@@ -33,27 +40,27 @@ class _EventTileState extends State<EventTile> {
     final event = widget.event;
     final card = widget.card;
 
-    Widget photo(double radius) => ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: AnimatedScale(
-        scale: _hovered ? 1.06 : 1,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOutCubic,
-        child: Image.asset(
-          event.photo,
-          fit: BoxFit.cover,
-          alignment: event.focus,
-          errorBuilder: (_, _, _) => const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [AppColors.earthLight, AppColors.brand],
-              ),
+    Widget photo(double radius) => Stack(
+      fit: StackFit.expand,
+      children: [
+        Hero(
+          tag: widget.heroTag,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius),
+            child: AnimatedScale(
+              scale: _hovered ? 1.06 : 1,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+              child: EventPhoto(event: event),
             ),
           ),
         ),
-      ),
+        Positioned(
+          right: 8 * s,
+          top: 8 * s,
+          child: _JoinedCheck(title: event.title, scale: s),
+        ),
+      ],
     );
 
     final details = Column(
@@ -154,9 +161,10 @@ class _EventTileState extends State<EventTile> {
                               Positioned(
                                 left: 10 * s,
                                 top: 10 * s,
-                                child: _CategoryTag(
-                                  label: event.category.label,
+                                child: EventCategoryTag(
+                                  category: event.category,
                                   scale: s,
+                                  shadow: true,
                                 ),
                               ),
                             ],
@@ -191,35 +199,124 @@ class _EventTileState extends State<EventTile> {
   }
 }
 
-/// Frosted label naming the event's category, over a card's photo.
-class _CategoryTag extends StatelessWidget {
-  const _CategoryTag({required this.label, required this.scale});
+/// The event's photo, cropped to fill, with a gradient while it loads.
+class EventPhoto extends StatelessWidget {
+  const EventPhoto({super.key, required this.event});
 
-  final String label;
+  final VolunteerEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      event.photo,
+      fit: BoxFit.cover,
+      alignment: event.focus,
+      errorBuilder: (_, _, _) => const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [AppColors.earthLight, AppColors.brand],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pill naming the event's category, in that category's colours.
+class EventCategoryTag extends StatelessWidget {
+  const EventCategoryTag({
+    super.key,
+    required this.category,
+    required this.scale,
+    this.fontSize = 12,
+    this.shadow = false,
+  });
+
+  final EventCategory category;
+  final double scale;
+  final double fontSize;
+
+  /// Lifts the tag off a photo.
+  final bool shadow;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    final size = fontSize * s;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: size * 0.95,
+        vertical: size * 0.45,
+      ),
+      decoration: BoxDecoration(
+        color: category.fill,
+        borderRadius: BorderRadius.circular(size * 2),
+        boxShadow: [
+          if (shadow)
+            BoxShadow(
+              color: AppColors.ink.withValues(alpha: 0.14),
+              blurRadius: 8 * s,
+              offset: Offset(0, 2 * s),
+            ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(category.icon, size: size * 1.1, color: category.text),
+          SizedBox(width: size * 0.4),
+          Text(
+            category.label,
+            style: TextStyle(
+              fontSize: size,
+              fontWeight: FontWeight.w600,
+              color: category.text,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small green check that pops onto the photo of an event the volunteer
+/// has joined.
+class _JoinedCheck extends StatelessWidget {
+  const _JoinedCheck({required this.title, required this.scale});
+
+  final String title;
   final double scale;
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10 * s, vertical: 5 * s),
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(20 * s),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink.withValues(alpha: 0.12),
-            blurRadius: 8 * s,
-            offset: Offset(0, 2 * s),
+    return ValueListenableBuilder(
+      valueListenable: EventPlans.joined,
+      builder: (context, joined, _) => AnimatedScale(
+        scale: joined.contains(title) ? 1 : 0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutBack,
+        child: Container(
+          width: 24 * s,
+          height: 24 * s,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.brand,
+            border: Border.all(color: AppColors.white, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.ink.withValues(alpha: 0.25),
+                blurRadius: 6 * s,
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12 * s,
-          fontWeight: FontWeight.w600,
-          color: AppColors.brand,
+          child: Icon(
+            Icons.check_rounded,
+            size: 14 * s,
+            color: AppColors.white,
+          ),
         ),
       ),
     );

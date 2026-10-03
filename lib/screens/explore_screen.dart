@@ -15,6 +15,7 @@ import '../widgets/onboarding_layout.dart';
 import '../widgets/page_scene.dart';
 import '../widgets/rise_in.dart';
 import '../widgets/soft_backdrop.dart';
+import 'event_details_screen.dart';
 
 /// Explore: search and filter every volunteering event.
 ///
@@ -28,10 +29,12 @@ import '../widgets/soft_backdrop.dart';
 /// the keyboard is up); laptops get the side navigation rail and the events
 /// as a grid of photo cards.
 ///
-/// Event details aren't designed yet, so tapping an event answers with a
-/// notice for now.
+/// Tapping an event opens its [EventDetailsScreen], its photo growing out
+/// of the tile.
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
+
+  static const String routeName = 'explore';
 
   static const String photo = 'assets/images/change_volunteers.jpg';
 
@@ -107,8 +110,14 @@ class _ExploreScreenState extends State<ExploreScreen>
     setState(() => _category = null);
   }
 
-  void _openEvent(VolunteerEvent event) =>
-      showAuthNotice(context, 'Event details are coming soon.');
+  void _openEvent(VolunteerEvent event) => openEventDetails(
+    context,
+    event,
+    from: AppTab.explore,
+    heroTag: _heroTag(event),
+  );
+
+  static Object _heroTag(VolunteerEvent event) => 'explore/${event.title}';
 
   @override
   Widget build(BuildContext context) {
@@ -301,6 +310,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                           scale: s,
                           card: false,
                           onTap: () => _openEvent(event),
+                          heroTag: _heroTag(event),
                         ),
                       ],
                     ),
@@ -424,6 +434,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                           scale: s,
                                           card: true,
                                           onTap: () => _openEvent(event),
+                                          heroTag: _heroTag(event),
                                         ),
                                       ),
                                     ),

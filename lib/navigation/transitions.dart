@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 /// Fades [page] in while it settles from a slight zoom, or from a short slide
 /// to the left when [slide] is set (for stepping forward through onboarding).
-Route<T> softRoute<T>(Widget page, {bool slide = false}) {
+///
+/// [name] labels the route so it can be found again in the history (see
+/// `openAppTab`).
+Route<T> softRoute<T>(Widget page, {bool slide = false, String? name}) {
   return PageRouteBuilder<T>(
+    settings: RouteSettings(name: name),
     transitionDuration: const Duration(milliseconds: 900),
     reverseTransitionDuration: const Duration(milliseconds: 500),
     pageBuilder: (_, _, _) => page,

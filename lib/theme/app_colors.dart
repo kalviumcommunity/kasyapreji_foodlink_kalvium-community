@@ -105,6 +105,13 @@ class AppColors {
   /// Warm amber for the waving hand on the home greeting.
   static const Color sun = Color(0xFFE0A63A);
 
+  /// Event category tags: warm amber for food drives, soft blue for
+  /// education (community uses the role card greens).
+  static const Color tagFoodFill = Color(0xFFF6E9D3);
+  static const Color tagFoodText = Color(0xFF8A5A1E);
+  static const Color tagLearnFill = Color(0xFFE1ECF4);
+  static const Color tagLearnText = Color(0xFF3D6683);
+
   // Splash effects
   static const Color glow = Color(0xFFDCEBD5);
   static const Color particle = Color(0xFFF4F9E8);
