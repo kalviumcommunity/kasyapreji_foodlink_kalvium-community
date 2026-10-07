@@ -6,7 +6,9 @@ import 'package:foodlink/auth/demo_account.dart';
 import 'package:foodlink/data/event_plans.dart';
 import 'package:foodlink/data/sample_events.dart';
 import 'package:foodlink/main.dart';
+import 'package:foodlink/data/join_options.dart';
 import 'package:foodlink/screens/change_screen.dart';
+import 'package:foodlink/screens/confirm_join_screen.dart';
 import 'package:foodlink/screens/event_details_screen.dart';
 import 'package:foodlink/screens/explore_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
@@ -553,8 +555,21 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('^50 of 60 spots')), findsOneWidget);
 
     await tapVisible(tester, find.bySemanticsLabel('Join Event'));
+    await settle(tester, 20);
+    expect(find.byType(ConfirmJoinScreen), findsOneWidget);
+    expect(find.text('Confirm Your Details'), findsOneWidget);
+    expect(EventPlans.hasJoined('Community Food Drive'), isFalse);
+
+    await tapVisible(tester, find.bySemanticsLabel('Confirm & Join'));
+    await settle(tester, 25);
+    expect(find.text('You’re in!'), findsOneWidget);
+    expect(EventPlans.hasJoined('Community Food Drive'), isTrue);
+
+    await tapVisible(tester, find.bySemanticsLabel('Back to Event'));
     await settle(tester, 15);
+    expect(find.byType(ConfirmJoinScreen), findsNothing);
     expect(find.text("You're Going"), findsOneWidget);
+    expect(find.text('Food Packing · Full Event'), findsOneWidget);
     expect(find.bySemanticsLabel('51 Volunteers'), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp('^51 of 60 spots')), findsOneWidget);
     expect(EventPlans.hasJoined('Community Food Drive'), isTrue);
@@ -564,6 +579,85 @@ void main() {
     expect(find.bySemanticsLabel('Join Event'), findsOneWidget);
     expect(find.bySemanticsLabel('50 Volunteers'), findsOneWidget);
     expect(EventPlans.hasJoined('Community Food Drive'), isFalse);
+  });
+
+  testWidgets('Confirm Your Details keeps the chosen role, slot and notes', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(home: ConfirmJoinScreen(event: sampleEvents.first)),
+    );
+    await settle(tester, 20);
+    expect(find.bySemanticsLabel('Role: Food Packing'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Time Slot: Full Event (10 AM – 2 PM)'),
+      findsOneWidget,
+    );
+
+    await tapVisible(tester, find.bySemanticsLabel('Role: Food Packing'));
+    await settle(tester, 5);
+    await tapVisible(tester, find.bySemanticsLabel('Distribution'));
+    await settle(tester, 5);
+    expect(find.bySemanticsLabel('Role: Distribution'), findsOneWidget);
+
+    await tapVisible(
+      tester,
+      find.bySemanticsLabel('Time Slot: Full Event (10 AM – 2 PM)'),
+    );
+    await settle(tester, 5);
+    await tapVisible(
+      tester,
+      find.bySemanticsLabel('Second Half (12 PM – 2 PM)'),
+    );
+    await settle(tester, 5);
+
+    await tapVisible(tester, find.bySemanticsLabel('Coming with a friend'));
+    await settle(tester, 3);
+    await tapVisible(tester, find.bySemanticsLabel('Remind me the day before'));
+    await settle(tester, 3);
+    expect(tester.takeException(), isNull);
+
+    await tapVisible(tester, find.bySemanticsLabel('Confirm & Join'));
+    await settle(tester, 25);
+    final details = EventPlans.detailsFor('Community Food Drive')!;
+    expect(details.role.name, 'Distribution');
+    expect(details.slot.name, 'Second Half');
+    expect(details.notes, 'Coming with a friend');
+    expect(details.remind, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('Time slots split each event into halves', () {
+    for (final event in sampleEvents) {
+      final slots = timeSlotsFor(event);
+      expect(slots.map((slot) => slot.name), [
+        'Full Event',
+        'First Half',
+        'Second Half',
+      ], reason: event.title);
+    }
+    expect(timeSlotsFor(sampleEvents.last).map((slot) => slot.range), [
+      '2 PM – 4:30 PM',
+      '2 PM – 3:30 PM',
+      '3:30 PM – 4:30 PM',
+    ]);
+  });
+
+  testWidgets('Confirm Your Details fits a laptop', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(home: ConfirmJoinScreen(event: sampleEvents[5])),
+    );
+    await settle(tester, 20);
+    expect(find.text('What happens next'), findsOneWidget);
+    await tapVisible(tester, find.bySemanticsLabel('Role: Participant'));
+    await settle(tester, 5);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('The heart saves an event', (tester) async {
