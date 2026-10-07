@@ -29,6 +29,12 @@ flutter:
     - assets/images/role_volunteer.jpg
     - assets/images/role_coordinator.jpg
     - assets/images/notifications_community_farm.jpg
+    - assets/images/event_harvest_greens.jpg
+    - assets/images/event_potato_sorting.jpg
+    - assets/images/event_community_meal.jpg
+    - assets/images/event_food_warehouse.jpg
+    - assets/images/event_tree_planting.jpg
+    - assets/images/event_serving_line.jpg
 
   # Fraunces (headings) and Plus Jakarta Sans (body), both SIL OFL 1.1.
   fonts:

@@ -1886,8 +1886,8 @@ class _GoingButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = scale;
     return Container(
-      height: 60 * s,
-      padding: EdgeInsets.only(left: 10 * s, right: 22 * s),
+      constraints: BoxConstraints(minHeight: 60 * s),
+      padding: EdgeInsets.fromLTRB(10 * s, 8 * s, 22 * s, 8 * s),
       decoration: BoxDecoration(
         color: AppColors.roleChosenFill,
         borderRadius: BorderRadius.circular(30 * s),
