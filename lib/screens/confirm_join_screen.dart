@@ -221,6 +221,7 @@ class _ConfirmJoinScreenState extends State<ConfirmJoinScreen>
                         scale: s,
                         onDone: () => Navigator.of(context).maybePop(),
                         onExplore: () => _openTab(AppTab.explore),
+                        onMyEvents: () => _openTab(AppTab.events),
                       ),
                     ),
                 ],
@@ -1848,6 +1849,7 @@ class _Celebration extends StatelessWidget {
     required this.scale,
     required this.onDone,
     required this.onExplore,
+    required this.onMyEvents,
   });
 
   final VolunteerEvent event;
@@ -1859,6 +1861,7 @@ class _Celebration extends StatelessWidget {
   final double scale;
   final VoidCallback onDone;
   final VoidCallback onExplore;
+  final VoidCallback onMyEvents;
 
   @override
   Widget build(BuildContext context) {
@@ -2039,13 +2042,32 @@ class _Celebration extends StatelessWidget {
                                   onPressed: onDone,
                                 ),
                                 SizedBox(height: 12 * s),
-                                Center(
-                                  child: AuthTextLink(
-                                    label: 'Explore more events',
-                                    scale: s,
-                                    fontSize: 15,
-                                    onTap: onExplore,
-                                  ),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 10 * s,
+                                  runSpacing: 6 * s,
+                                  children: [
+                                    AuthTextLink(
+                                      label: 'View My Events',
+                                      scale: s,
+                                      fontSize: 15,
+                                      onTap: onMyEvents,
+                                    ),
+                                    Text(
+                                      '·',
+                                      style: TextStyle(
+                                        fontSize: 15 * s,
+                                        color: AppColors.fieldHint,
+                                      ),
+                                    ),
+                                    AuthTextLink(
+                                      label: 'Explore more',
+                                      scale: s,
+                                      fontSize: 15,
+                                      onTap: onExplore,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

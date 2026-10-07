@@ -1,18 +1,22 @@
 import 'package:flutter/foundation.dart';
 
 import 'join_options.dart';
+import 'my_events.dart';
 
 /// Events the volunteer has joined or saved, by title, kept in memory until
 /// accounts exist. Event lists and the details page listen, so a join shows
-/// everywhere at once.
+/// everywhere at once. It starts with the [initialPlans] the volunteer had
+/// already made.
 class EventPlans {
   EventPlans._();
 
-  static final ValueNotifier<Set<String>> joined = ValueNotifier({});
-  static final ValueNotifier<Set<String>> saved = ValueNotifier({});
-
   /// The role, time slot and notes chosen for each joined event.
-  static final Map<String, JoinDetails> _details = {};
+  static final Map<String, JoinDetails> _details = initialPlans();
+
+  static final ValueNotifier<Set<String>> joined = ValueNotifier({
+    ..._details.keys,
+  });
+  static final ValueNotifier<Set<String>> saved = ValueNotifier({});
 
   static bool hasJoined(String title) => joined.value.contains(title);
   static bool hasSaved(String title) => saved.value.contains(title);
@@ -36,8 +40,10 @@ class EventPlans {
 
   @visibleForTesting
   static void reset() {
-    _details.clear();
-    joined.value = {};
+    _details
+      ..clear()
+      ..addAll(initialPlans());
+    joined.value = {..._details.keys};
     saved.value = {};
   }
 }

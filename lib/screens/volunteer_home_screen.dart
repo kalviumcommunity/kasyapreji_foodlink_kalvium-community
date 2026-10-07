@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/my_events.dart';
 import '../data/sample_events.dart';
 import '../navigation/tab_navigation.dart';
 import '../theme/app_colors.dart';
@@ -19,10 +20,19 @@ import 'event_details_screen.dart';
 import 'explore_screen.dart';
 
 /// The volunteer's numbers: value, label, icon. Sample values for now.
-const _stats = [
-  (12, 'Events', Icons.event_available_rounded),
-  (36, 'Hours', Icons.schedule_rounded),
-  (5, 'Communities', Icons.groups_rounded),
+/// The volunteer's numbers, from the events they've been to.
+final _stats = [
+  (pastVisits.length, 'Events', Icons.event_available_rounded),
+  (
+    pastVisits.fold(0, (sum, visit) => sum + visit.hours),
+    'Hours',
+    Icons.schedule_rounded,
+  ),
+  (
+    {for (final visit in pastVisits) visit.event.organiser}.length,
+    'Communities',
+    Icons.groups_rounded,
+  ),
 ];
 
 /// Volunteer home: greeting, a quote, the volunteer's numbers and upcoming
