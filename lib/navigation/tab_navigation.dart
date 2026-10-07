@@ -4,6 +4,11 @@ import 'package:flutter/services.dart';
 import '../data/sample_events.dart';
 import '../screens/event_details_screen.dart';
 import '../screens/community_screen.dart';
+import '../screens/coordinator/events_screen.dart';
+import '../screens/coordinator/profile_screen.dart';
+import '../screens/coordinator/reports_screen.dart';
+import '../screens/coordinator/volunteers_screen.dart';
+import '../screens/coordinator_home_screen.dart';
 import '../screens/explore_screen.dart';
 import '../screens/my_events_screen.dart';
 import '../screens/profile_screen.dart';
@@ -78,6 +83,52 @@ void openAppTab(BuildContext context, AppTab? from, AppTab to) {
         );
       }
   }
+}
+
+/// Moves between the coordinator's sections, like [openAppTab]: Home is
+/// the base, other sections open on top of it, and a section already in the
+/// history is stepped back to rather than opened twice.
+void openCoordinatorTab(
+  BuildContext context,
+  CoordinatorTab? from,
+  CoordinatorTab to,
+) {
+  if (from == to) return;
+  HapticFeedback.selectionClick();
+  final navigator = Navigator.of(context);
+  if (to == CoordinatorTab.home) {
+    final found = _popBackTo(navigator, CoordinatorHomeScreen.routeName);
+    if (!found) {
+      navigator.pushReplacement(
+        softRoute(
+          const CoordinatorHomeScreen(),
+          name: CoordinatorHomeScreen.routeName,
+        ),
+      );
+    }
+    return;
+  }
+  final (name, page) = switch (to) {
+    CoordinatorTab.events => (
+      CoordinatorEventsScreen.routeName,
+      const CoordinatorEventsScreen() as Widget,
+    ),
+    CoordinatorTab.volunteers => (
+      CoordinatorVolunteersScreen.routeName,
+      const CoordinatorVolunteersScreen(),
+    ),
+    CoordinatorTab.reports => (
+      ImpactReportsScreen.routeName,
+      const ImpactReportsScreen(),
+    ),
+    _ => (CoordinatorProfileScreen.routeName, const CoordinatorProfileScreen()),
+  };
+  final found = _popBackTo(
+    navigator,
+    name,
+    orTo: CoordinatorHomeScreen.routeName,
+  );
+  if (!found) navigator.push(softRoute(page, name: name));
 }
 
 /// Opens [event]'s details from the [from] section. [heroTag] is the tag of

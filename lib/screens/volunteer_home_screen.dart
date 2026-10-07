@@ -19,7 +19,6 @@ import '../widgets/soft_backdrop.dart';
 import 'event_details_screen.dart';
 import 'explore_screen.dart';
 
-/// The volunteer's numbers: value, label, icon. Sample values for now.
 /// The volunteer's numbers, from the events they've been to.
 final _stats = [
   (pastVisits.length, 'Events', Icons.event_available_rounded),
@@ -44,10 +43,9 @@ final _stats = [
 /// Phones follow the Figma frame with a bottom navigation bar; laptops get a
 /// side navigation rail and the events as a grid of photo cards.
 ///
-/// The Explore tab and "View All" open [ExploreScreen], and each event opens
-/// its [EventDetailsScreen]. The other sections aren't designed yet, so they
-/// answer with a notice for now. [name] and the numbers are sample values until
-/// accounts exist.
+/// The Explore tab and "View All" open [ExploreScreen], each event opens its
+/// [EventDetailsScreen], and the other tabs open their sections. [name] is a
+/// sample value until accounts exist.
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key, this.name = 'Agnibha'});
 
