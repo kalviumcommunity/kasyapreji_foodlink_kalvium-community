@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:foodlink/auth/demo_account.dart';
+import 'package:foodlink/data/community.dart';
 import 'package:foodlink/data/event_plans.dart';
 import 'package:foodlink/data/sample_events.dart';
 import 'package:foodlink/main.dart';
 import 'package:foodlink/data/join_options.dart';
 import 'package:foodlink/screens/change_screen.dart';
+import 'package:foodlink/screens/community_screen.dart';
 import 'package:foodlink/screens/confirm_join_screen.dart';
 import 'package:foodlink/screens/event_details_screen.dart';
 import 'package:foodlink/screens/explore_screen.dart';
@@ -18,6 +20,7 @@ import 'package:foodlink/screens/onboarding_screen.dart';
 import 'package:foodlink/screens/role_screen.dart';
 import 'package:foodlink/screens/sign_in_screen.dart';
 import 'package:foodlink/screens/sign_up_screen.dart';
+import 'package:foodlink/screens/story_screen.dart';
 import 'package:foodlink/screens/volunteer_home_screen.dart';
 import 'package:foodlink/widgets/primary_button.dart';
 
@@ -25,7 +28,10 @@ VolunteerEvent _event(String title) =>
     sampleEvents.firstWhere((event) => event.title == title);
 
 void main() {
-  setUp(EventPlans.reset);
+  setUp(() {
+    EventPlans.reset();
+    CommunityFeed.reset();
+  });
 
   testWidgets('Splash screen shows brand name and taglines', (tester) async {
     await tester.pumpWidget(const FoodLinkApp());
@@ -855,5 +861,107 @@ void main() {
     await settle(tester, 10);
     expect(find.text('Certificate earned'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Community tab opens Community from the home', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+    await tapVisible(tester, find.bySemanticsLabel('Community tab'));
+    await settle(tester, 25);
+    expect(find.byType(CommunityScreen), findsOneWidget);
+    expect(find.text('Riya Sharma'), findsWidgets);
+  });
+
+  testWidgets('Community posts can be liked, commented on and shared', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CommunityScreen()));
+    await settle(tester, 25);
+    expect(find.bySemanticsLabel('Posts tab'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Like the first post.
+    await tapVisible(tester, find.bySemanticsLabel('Like, 124').first);
+    await settle(tester, 5);
+    expect(find.bySemanticsLabel('Unlike, 125'), findsOneWidget);
+    expect(CommunityFeed.hasLiked('riya-1'), isTrue);
+
+    // Comment on it.
+    await tapVisible(tester, find.bySemanticsLabel('Comments, 12').first);
+    await settle(tester, 10);
+    expect(
+      find.text('Such a great team today. Same time next week?'),
+      findsOneWidget,
+    );
+    await tester.enterText(find.byType(TextField).last, 'See you there!');
+    await tester.tap(find.bySemanticsLabel('Send comment'));
+    await settle(tester, 10);
+    expect(find.text('See you there!'), findsOneWidget);
+    expect(CommunityFeed.byId('riya-1')!.commentCount, 13);
+    await tester.tapAt(const Offset(195, 40));
+    await settle(tester, 10);
+
+    // Share a post of our own.
+    await tapVisible(tester, find.bySemanticsLabel('Share a moment'));
+    await settle(tester, 10);
+    await tester.enterText(find.byType(TextField).last, 'My first post!');
+    await tester.pump();
+    await tapVisible(tester, find.bySemanticsLabel('Share post'));
+    await settle(tester, 15);
+    expect(CommunityFeed.posts.value.first.text, 'My first post!');
+    expect(find.text('My first post!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Community stories and impact fit a phone', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CommunityScreen()));
+    await settle(tester, 25);
+
+    await tester.tap(find.bySemanticsLabel('Impact tab'));
+    await settle(tester, 25);
+    expect(find.bySemanticsLabel('48,250 meals shared'), findsOneWidget);
+    expect(find.text('Top volunteers this month'), findsOneWidget);
+    await tapVisible(tester, find.bySemanticsLabel('Jun: 5,900 meals'));
+    await settle(tester, 5);
+    expect(find.text('meals in Jun'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tapVisible(tester, find.bySemanticsLabel('Stories tab'));
+    await settle(tester, 15);
+    await tapVisible(
+      tester,
+      find.bySemanticsLabel('Story: What I learned in my first 10 events'),
+    );
+    await settle(tester, 20);
+    expect(find.byType(StoryScreen), findsOneWidget);
+    await tester.drag(
+      find.byType(SingleChildScrollView).first,
+      const Offset(0, -2000),
+    );
+    await settle(tester, 10);
+    expect(find.text('Did this story inspire you?'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Community fits a laptop on every tab', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CommunityScreen()));
+    await settle(tester, 25);
+    expect(find.text('FoodLink'), findsWidgets);
+    expect(find.text('Top volunteers this month'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    for (final tab in ['Stories tab', 'Impact tab']) {
+      await tapVisible(tester, find.bySemanticsLabel(tab));
+      await settle(tester, 20);
+      expect(tester.takeException(), isNull);
+    }
   });
 }

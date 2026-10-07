@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../data/sample_events.dart';
 import '../screens/event_details_screen.dart';
+import '../screens/community_screen.dart';
 import '../screens/explore_screen.dart';
 import '../screens/my_events_screen.dart';
 import '../screens/volunteer_home_screen.dart';
@@ -53,6 +54,17 @@ void openAppTab(BuildContext context, AppTab? from, AppTab to) {
       if (!found) {
         navigator.push(
           softRoute(const MyEventsScreen(), name: MyEventsScreen.routeName),
+        );
+      }
+    case AppTab.community:
+      final found = _popBackTo(
+        navigator,
+        CommunityScreen.routeName,
+        orTo: VolunteerHomeScreen.routeName,
+      );
+      if (!found) {
+        navigator.push(
+          softRoute(const CommunityScreen(), name: CommunityScreen.routeName),
         );
       }
     default:
