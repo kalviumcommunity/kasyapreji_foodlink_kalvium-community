@@ -6,6 +6,7 @@ import 'package:foodlink/auth/demo_account.dart';
 import 'package:foodlink/data/community.dart';
 import 'package:foodlink/data/event_plans.dart';
 import 'package:foodlink/data/sample_events.dart';
+import 'package:foodlink/data/volunteer_profile.dart';
 import 'package:foodlink/main.dart';
 import 'package:foodlink/data/join_options.dart';
 import 'package:foodlink/screens/change_screen.dart';
@@ -17,6 +18,8 @@ import 'package:foodlink/screens/my_events_screen.dart';
 import 'package:foodlink/screens/impact_screen.dart';
 import 'package:foodlink/screens/notifications_screen.dart';
 import 'package:foodlink/screens/onboarding_screen.dart';
+import 'package:foodlink/screens/profile_pages.dart';
+import 'package:foodlink/screens/profile_screen.dart';
 import 'package:foodlink/screens/role_screen.dart';
 import 'package:foodlink/screens/sign_in_screen.dart';
 import 'package:foodlink/screens/sign_up_screen.dart';
@@ -31,6 +34,7 @@ void main() {
   setUp(() {
     EventPlans.reset();
     CommunityFeed.reset();
+    VolunteerProfile.reset();
   });
 
   testWidgets('Splash screen shows brand name and taglines', (tester) async {
@@ -963,5 +967,131 @@ void main() {
       await settle(tester, 20);
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets('Profile opens from the home tab and the avatar', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: VolunteerHomeScreen()));
+    await settle(tester, 25);
+    await tapVisible(tester, find.bySemanticsLabel('Profile tab'));
+    await settle(tester, 25);
+    expect(find.byType(ProfileScreen), findsOneWidget);
+    expect(find.text('Agnibha Bhattacharya'), findsOneWidget);
+
+    await tapVisible(tester, find.bySemanticsLabel('Explore tab'));
+    await settle(tester, 25);
+    await tapVisible(tester, find.bySemanticsLabel('Profile').first);
+    await settle(tester, 25);
+    expect(find.byType(ProfileScreen), findsOneWidget);
+  });
+
+  testWidgets('Profile fits a phone and opens every page', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+    await settle(tester, 25);
+
+    expect(find.bySemanticsLabel('12 Events'), findsOneWidget);
+    expect(find.bySemanticsLabel('36 Hours'), findsOneWidget);
+    expect(find.bySemanticsLabel('5 Certificates'), findsOneWidget);
+    expect(find.text('Community Champion'), findsOneWidget);
+    expect(find.text('14 more hours to Food Hero'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    for (final (label, page) in [
+      ('Personal Information', PersonalInfoScreen),
+      ('Interests', InterestsScreen),
+      ('Certificates', CertificatesScreen),
+      ('Settings', SettingsScreen),
+      ('Help & Support', HelpScreen),
+    ]) {
+      await tapVisible(tester, find.bySemanticsLabel(label));
+      await settle(tester, 15);
+      expect(find.byType(page), findsOneWidget, reason: label);
+      expect(tester.takeException(), isNull, reason: label);
+      await tester.tap(find.bySemanticsLabel('Back'));
+      await settle(tester, 10);
+    }
+  });
+
+  testWidgets('Personal information checks and saves', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+    await settle(tester, 25);
+    await tapVisible(tester, find.bySemanticsLabel('Personal Information'));
+    await settle(tester, 15);
+
+    await tester.enterText(find.byType(TextField).at(1), 'not-an-email');
+    await tester.tap(find.bySemanticsLabel('Save Changes'));
+    await settle(tester, 5);
+    expect(find.text('Please enter a valid email'), findsOneWidget);
+    expect(VolunteerProfile.details.value.email, 'demo@foodlink.org');
+
+    await tester.enterText(find.byType(TextField).at(1), 'me@foodlink.org');
+    await tester.enterText(find.byType(TextField).first, 'Agnibha B.');
+    await tester.tap(find.bySemanticsLabel('Save Changes'));
+    await settle(tester, 15);
+    expect(VolunteerProfile.details.value.email, 'me@foodlink.org');
+    expect(find.byType(ProfileScreen), findsOneWidget);
+    expect(find.text('Agnibha B.'), findsOneWidget);
+  });
+
+  testWidgets('Interests and settings save', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: InterestsScreen())),
+    );
+    await settle(tester, 15);
+    await tapVisible(tester, find.bySemanticsLabel('Education'));
+    await tapVisible(tester, find.bySemanticsLabel('Mon'));
+    await tester.pump();
+    await tapVisible(tester, find.bySemanticsLabel('Save Interests'));
+    await settle(tester, 10);
+    expect(VolunteerProfile.interests.value, contains('Education'));
+    expect(VolunteerProfile.days.value, contains('Mon'));
+
+    await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
+    await settle(tester, 15);
+    await tapVisible(tester, find.bySemanticsLabel('Weekly summary'));
+    await settle(tester, 3);
+    expect(VolunteerProfile.settings.value.weeklySummary, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Log Out asks first, then returns to Sign In', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.bySemanticsLabel('Log Out'));
+    await settle(tester, 6);
+    expect(find.text('Log out of FoodLink?'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Cancel button'));
+    await settle(tester, 6);
+    expect(find.byType(ProfileScreen), findsOneWidget);
+
+    await tapVisible(tester, find.bySemanticsLabel('Log Out'));
+    await settle(tester, 6);
+    await tester.tap(find.bySemanticsLabel('Log Out button'));
+    await settle(tester, 20);
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(find.byType(ProfileScreen), findsNothing);
+  });
+
+  testWidgets('Profile fits a laptop', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+    await settle(tester, 25);
+    expect(find.text('Badges'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tapVisible(tester, find.bySemanticsLabel('Certificates'));
+    await settle(tester, 15);
+    expect(find.text('CERTIFICATE OF PARTICIPATION'), findsNWidgets(5));
+    expect(tester.takeException(), isNull);
   });
 }

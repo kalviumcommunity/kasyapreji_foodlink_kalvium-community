@@ -396,7 +396,10 @@ class _MyEventsScreenState extends State<MyEventsScreen>
             ),
           ),
         const Spacer(),
-        AuthAvatar(scale: s * 1.1),
+        AuthAvatar(
+          scale: s * 1.1,
+          onTap: () => openAppTab(context, AppTab.events, AppTab.profile),
+        ),
       ],
     );
   }

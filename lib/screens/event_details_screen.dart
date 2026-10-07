@@ -618,7 +618,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen>
           ),
         ),
         SizedBox(width: 10 * s),
-        AuthAvatar(scale: s * 1.1),
+        AuthAvatar(
+          scale: s * 1.1,
+          onTap: () => openAppTab(context, null, AppTab.profile),
+        ),
       ],
     );
   }
