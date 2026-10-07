@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/event_plans.dart';
+import '../data/join_options.dart';
 import '../data/sample_events.dart';
 import '../navigation/tab_navigation.dart';
+import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/app_nav.dart';
@@ -17,6 +19,7 @@ import '../widgets/onboarding_layout.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/rise_in.dart';
 import '../widgets/soft_backdrop.dart';
+import 'confirm_join_screen.dart';
 
 /// One event in full: its photo, when and where, what it's about, its
 /// numbers, who's going, where it is, what to bring and who runs it.
@@ -28,9 +31,10 @@ import '../widgets/soft_backdrop.dart';
 /// event's category colour; numbers count up, the spots bar shimmers and the
 /// pin on the little painted map pulses.
 ///
-/// Joining pops a burst of colour, puts the volunteer at the front of the
-/// "who's going" avatars, and checks the event's tile in every list; the
-/// heart saves it.
+/// Join Event opens [ConfirmJoinScreen] to pick a role and time slot. Once
+/// they've confirmed, a burst of colour pops here, the volunteer joins the
+/// front of the "who's going" avatars, the event's tile is checked in every
+/// list, and the button shows what they signed up for; the heart saves it.
 ///
 /// Phones follow the Figma frame, with Join Event pinned to the bottom on
 /// frosted glass; laptops get the side navigation rail ([tab] highlighted)
@@ -106,15 +110,18 @@ class _EventDetailsScreenState extends State<EventDetailsScreen>
 
   // No pop-up notices here: they would cover the pinned Join bar, and the
   // button, burst, avatars and counts already show what happened.
-  void _join() {
-    HapticFeedback.mediumImpact();
-    EventPlans.toggleJoined(_event.title);
-    _burst.forward(from: 0);
+  Future<void> _join() async {
+    await Navigator.of(context).push(
+      softRoute(
+        ConfirmJoinScreen(event: _event, tab: widget.tab, heroTag: _heroTag),
+      ),
+    );
+    if (mounted && _joined) _burst.forward(from: 0);
   }
 
   void _leave() {
     HapticFeedback.selectionClick();
-    EventPlans.toggleJoined(_event.title);
+    EventPlans.leave(_event.title);
   }
 
   void _toggleSaved() {
@@ -807,6 +814,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen>
     if (_joined) {
       child = _GoingButton(
         key: const ValueKey('going'),
+        details: EventPlans.detailsFor(_event.title),
         scale: s,
         onLeave: _leave,
       );
@@ -1860,10 +1868,17 @@ class _OrganiserCard extends StatelessWidget {
   }
 }
 
-/// Pale green pill shown once the volunteer has joined, with a Leave link.
+/// Pale green pill shown once the volunteer has joined, with their role and
+/// time slot and a Leave link.
 class _GoingButton extends StatelessWidget {
-  const _GoingButton({super.key, required this.scale, required this.onLeave});
+  const _GoingButton({
+    super.key,
+    required this.details,
+    required this.scale,
+    required this.onLeave,
+  });
 
+  final JoinDetails? details;
   final double scale;
   final VoidCallback onLeave;
 
@@ -1895,16 +1910,33 @@ class _GoingButton extends StatelessWidget {
           ),
           SizedBox(width: 12 * s),
           Expanded(
-            child: Semantics(
-              liveRegion: true,
-              child: Text(
-                "You're Going",
-                style: TextStyle(
-                  fontSize: 17 * s,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.brand,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    "You're Going",
+                    style: TextStyle(
+                      fontSize: 17 * s,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brand,
+                    ),
+                  ),
                 ),
-              ),
+                if (details case final details?)
+                  Text(
+                    '${details.role.name} · ${details.slot.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5 * s,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.brandText,
+                    ),
+                  ),
+              ],
             ),
           ),
           AuthTextLink(
