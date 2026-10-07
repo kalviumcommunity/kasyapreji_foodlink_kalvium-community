@@ -6,9 +6,9 @@ import '../screens/event_details_screen.dart';
 import '../screens/community_screen.dart';
 import '../screens/explore_screen.dart';
 import '../screens/my_events_screen.dart';
+import '../screens/profile_screen.dart';
 import '../screens/volunteer_home_screen.dart';
 import '../widgets/app_nav.dart';
-import '../widgets/auth_widgets.dart';
 import 'transitions.dart';
 
 /// Moves from the [from] section to [to] when its tab is tapped. [from] is
@@ -17,8 +17,7 @@ import 'transitions.dart';
 /// Home is the base of the volunteer's sections: other sections open on top
 /// of it, and going Home steps back to it. Opening a section that is already
 /// in the history (say Explore, from an event opened there) steps back to it
-/// rather than stacking a second copy. Sections that aren't designed yet
-/// answer with a notice.
+/// rather than stacking a second copy.
 void openAppTab(BuildContext context, AppTab? from, AppTab to) {
   if (from == to) return;
   HapticFeedback.selectionClick();
@@ -67,8 +66,17 @@ void openAppTab(BuildContext context, AppTab? from, AppTab to) {
           softRoute(const CommunityScreen(), name: CommunityScreen.routeName),
         );
       }
-    default:
-      showAuthNotice(context, '${to.label} is coming soon.');
+    case AppTab.profile:
+      final found = _popBackTo(
+        navigator,
+        ProfileScreen.routeName,
+        orTo: VolunteerHomeScreen.routeName,
+      );
+      if (!found) {
+        navigator.push(
+          softRoute(const ProfileScreen(), name: ProfileScreen.routeName),
+        );
+      }
   }
 }
 

@@ -375,7 +375,10 @@ class _CommunityScreenState extends State<CommunityScreen>
             ),
           ),
         const Spacer(),
-        AuthAvatar(scale: s * 1.1),
+        AuthAvatar(
+          scale: s * 1.1,
+          onTap: () => openAppTab(context, AppTab.community, AppTab.profile),
+        ),
       ],
     );
   }

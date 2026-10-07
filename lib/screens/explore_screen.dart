@@ -136,6 +136,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         body: GestureDetector(
           // Tapping outside the search bar puts the keyboard away.
           behavior: HitTestBehavior.translucent,
+          excludeFromSemantics: true,
           onTap: () => FocusScope.of(context).unfocus(),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -488,7 +489,10 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ),
         const Spacer(),
-        AuthAvatar(scale: s * 1.1),
+        AuthAvatar(
+          scale: s * 1.1,
+          onTap: () => openAppTab(context, AppTab.explore, AppTab.profile),
+        ),
       ],
     );
   }

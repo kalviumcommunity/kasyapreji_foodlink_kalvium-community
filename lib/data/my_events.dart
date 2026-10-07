@@ -152,6 +152,7 @@ final pastVisits = [
     thanks:
         'Four hundred and fifty plates, served with care. You made the '
         'holiday feel like a celebration for everyone.',
+    certificate: true,
   ),
   _visit(
     title: 'Food Bank Sort-a-thon',
@@ -172,6 +173,7 @@ final pastVisits = [
     thanks:
         'Over a tonne of food sorted in one afternoon. Our shelves have '
         'never looked so tidy!',
+    certificate: true,
   ),
   _visit(
     title: 'Park Clean & Picnic',

@@ -91,17 +91,20 @@ class AuthIconButton extends StatelessWidget {
   }
 }
 
-/// Profile placeholder in the top-right, as in the designs.
+/// Profile placeholder in the top-right, as in the designs. With [onTap]
+/// it's a button (opening the profile).
 class AuthAvatar extends StatelessWidget {
-  const AuthAvatar({super.key, required this.scale});
+  const AuthAvatar({super.key, required this.scale, this.onTap});
 
   final double scale;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final d = 40 * scale;
-    return Semantics(
+    final avatar = Semantics(
       label: 'Profile',
+      button: onTap != null,
       child: Container(
         width: d,
         height: d,
@@ -127,6 +130,11 @@ class AuthAvatar extends StatelessWidget {
           color: const Color(0xFFF3E4D6),
         ),
       ),
+    );
+    if (onTap == null) return avatar;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(onTap: onTap, child: avatar),
     );
   }
 }

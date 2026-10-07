@@ -582,7 +582,10 @@ class _ConfirmJoinScreenState extends State<ConfirmJoinScreen>
             ),
           ),
         const Spacer(),
-        AuthAvatar(scale: s * 1.1),
+        AuthAvatar(
+          scale: s * 1.1,
+          onTap: () => openAppTab(context, null, AppTab.profile),
+        ),
       ],
     );
   }

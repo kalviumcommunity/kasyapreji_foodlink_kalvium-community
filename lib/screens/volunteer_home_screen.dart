@@ -409,7 +409,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             ),
           ),
         const Spacer(),
-        AuthAvatar(scale: s * 1.1),
+        AuthAvatar(
+          scale: s * 1.1,
+          onTap: () => openAppTab(context, AppTab.home, AppTab.profile),
+        ),
       ],
     );
   }
