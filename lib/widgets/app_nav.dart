@@ -18,6 +18,84 @@ enum AppTab {
   final IconData icon;
 }
 
+/// The coordinator's main sections.
+enum CoordinatorTab {
+  home('Home', Icons.home_rounded),
+  events('Events', Icons.calendar_today_rounded),
+  volunteers('Volunteers', Icons.supervised_user_circle_outlined),
+  reports('Reports', Icons.bar_chart_rounded),
+  profile('Profile', Icons.person_outline_rounded);
+
+  const CoordinatorTab(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+/// One section in a navigation bar or rail.
+typedef NavEntry = ({
+  String label,
+  IconData icon,
+  bool selected,
+  VoidCallback onTap,
+});
+
+/// Phones: the coordinator's sections along the bottom, [current] in green.
+class CoordinatorBottomBar extends StatelessWidget {
+  const CoordinatorBottomBar({
+    super.key,
+    required this.current,
+    required this.scale,
+    required this.onSelect,
+  });
+
+  final CoordinatorTab current;
+  final double scale;
+  final ValueChanged<CoordinatorTab> onSelect;
+
+  @override
+  Widget build(BuildContext context) => NavBottomBar(
+    scale: scale,
+    entries: [
+      for (final tab in CoordinatorTab.values)
+        (
+          label: tab.label,
+          icon: tab.icon,
+          selected: tab == current,
+          onTap: () => onSelect(tab),
+        ),
+    ],
+  );
+}
+
+/// Laptops: brand mark and the coordinator's sections down the left side.
+class CoordinatorSideRail extends StatelessWidget {
+  const CoordinatorSideRail({
+    super.key,
+    required this.current,
+    required this.scale,
+    required this.onSelect,
+  });
+
+  final CoordinatorTab current;
+  final double scale;
+  final ValueChanged<CoordinatorTab> onSelect;
+
+  @override
+  Widget build(BuildContext context) => NavSideRail(
+    scale: scale,
+    entries: [
+      for (final tab in CoordinatorTab.values)
+        (
+          label: tab.label,
+          icon: tab.icon,
+          selected: tab == current,
+          onTap: () => onSelect(tab),
+        ),
+    ],
+  );
+}
+
 /// Phones: the sections along the bottom of the screen, [current] in green.
 class AppBottomBar extends StatelessWidget {
   const AppBottomBar({
@@ -30,6 +108,56 @@ class AppBottomBar extends StatelessWidget {
   final AppTab current;
   final double scale;
   final ValueChanged<AppTab> onSelect;
+
+  @override
+  Widget build(BuildContext context) => NavBottomBar(
+    scale: scale,
+    entries: [
+      for (final tab in AppTab.values)
+        (
+          label: tab.label,
+          icon: tab.icon,
+          selected: tab == current,
+          onTap: () => onSelect(tab),
+        ),
+    ],
+  );
+}
+
+/// Laptops: brand mark and the sections down the left side.
+class AppSideRail extends StatelessWidget {
+  const AppSideRail({
+    super.key,
+    required this.current,
+    required this.scale,
+    required this.onSelect,
+  });
+
+  final AppTab current;
+  final double scale;
+  final ValueChanged<AppTab> onSelect;
+
+  @override
+  Widget build(BuildContext context) => NavSideRail(
+    scale: scale,
+    entries: [
+      for (final tab in AppTab.values)
+        (
+          label: tab.label,
+          icon: tab.icon,
+          selected: tab == current,
+          onTap: () => onSelect(tab),
+        ),
+    ],
+  );
+}
+
+/// A bar of [entries] along the bottom of the screen.
+class NavBottomBar extends StatelessWidget {
+  const NavBottomBar({super.key, required this.entries, required this.scale});
+
+  final List<NavEntry> entries;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
@@ -52,15 +180,15 @@ class AppBottomBar extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(6 * s, 8 * s, 6 * s, 8 * s),
           child: Row(
             children: [
-              for (final tab in AppTab.values)
+              for (final entry in entries)
                 Expanded(
                   child: _NavItem(
-                    label: tab.label,
-                    icon: tab.icon,
-                    selected: tab == current,
+                    label: entry.label,
+                    icon: entry.icon,
+                    selected: entry.selected,
                     scale: s,
                     rail: false,
-                    onTap: () => onSelect(tab),
+                    onTap: entry.onTap,
                   ),
                 ),
             ],
@@ -71,18 +199,12 @@ class AppBottomBar extends StatelessWidget {
   }
 }
 
-/// Laptops: brand mark and the sections down the left side.
-class AppSideRail extends StatelessWidget {
-  const AppSideRail({
-    super.key,
-    required this.current,
-    required this.scale,
-    required this.onSelect,
-  });
+/// The brand mark and [entries] down the left side.
+class NavSideRail extends StatelessWidget {
+  const NavSideRail({super.key, required this.entries, required this.scale});
 
-  final AppTab current;
+  final List<NavEntry> entries;
   final double scale;
-  final ValueChanged<AppTab> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -125,16 +247,16 @@ class AppSideRail extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final tab in AppTab.values)
+                  for (final entry in entries)
                     Padding(
                       padding: EdgeInsets.only(bottom: 6 * s),
                       child: _NavItem(
-                        label: tab.label,
-                        icon: tab.icon,
-                        selected: tab == current,
+                        label: entry.label,
+                        icon: entry.icon,
+                        selected: entry.selected,
                         scale: s,
                         rail: true,
-                        onTap: () => onSelect(tab),
+                        onTap: entry.onTap,
                       ),
                     ),
                 ],

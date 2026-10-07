@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:foodlink/auth/demo_account.dart';
 import 'package:foodlink/data/community.dart';
+import 'package:foodlink/data/coordinator.dart';
 import 'package:foodlink/data/event_plans.dart';
 import 'package:foodlink/data/sample_events.dart';
 import 'package:foodlink/data/volunteer_profile.dart';
@@ -12,6 +13,15 @@ import 'package:foodlink/data/join_options.dart';
 import 'package:foodlink/screens/change_screen.dart';
 import 'package:foodlink/screens/community_screen.dart';
 import 'package:foodlink/screens/confirm_join_screen.dart';
+import 'package:foodlink/screens/coordinator/beneficiaries_screen.dart';
+import 'package:foodlink/screens/coordinator/beneficiary_details_screen.dart';
+import 'package:foodlink/screens/coordinator/create_event_screen.dart';
+import 'package:foodlink/screens/coordinator/event_details_screen.dart';
+import 'package:foodlink/screens/coordinator/events_screen.dart';
+import 'package:foodlink/screens/coordinator/profile_screen.dart';
+import 'package:foodlink/screens/coordinator/reports_screen.dart';
+import 'package:foodlink/screens/coordinator/volunteers_screen.dart';
+import 'package:foodlink/screens/coordinator_home_screen.dart';
 import 'package:foodlink/screens/event_details_screen.dart';
 import 'package:foodlink/screens/explore_screen.dart';
 import 'package:foodlink/screens/my_events_screen.dart';
@@ -35,6 +45,7 @@ void main() {
     EventPlans.reset();
     CommunityFeed.reset();
     VolunteerProfile.reset();
+    CoordinatorBoard.reset();
   });
 
   testWidgets('Splash screen shows brand name and taglines', (tester) async {
@@ -381,7 +392,7 @@ void main() {
     expect(find.byType(VolunteerHomeScreen), findsOneWidget);
   });
 
-  testWidgets('Coordinators do not get the volunteer home', (tester) async {
+  testWidgets('Coordinators get the coordinator home', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: RoleScreen()));
     await settle(tester, 25);
 
@@ -393,7 +404,7 @@ void main() {
     await settle(tester, 15);
 
     expect(find.byType(VolunteerHomeScreen), findsNothing);
-    expect(find.text('The coordinator home is coming soon.'), findsOneWidget);
+    expect(find.byType(CoordinatorHomeScreen), findsOneWidget);
   });
 
   testWidgets('Volunteer home shows greeting, numbers and events', (
@@ -1092,6 +1103,394 @@ void main() {
     await tapVisible(tester, find.bySemanticsLabel('Certificates'));
     await settle(tester, 15);
     expect(find.text('CERTIFICATE OF PARTICIPATION'), findsNWidgets(5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator home fits a phone and checks volunteers in', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CoordinatorHomeScreen()));
+    await settle(tester, 25);
+
+    expect(find.text('Coordinator'), findsOneWidget);
+    expect(find.bySemanticsLabel('5 Active Events'), findsOneWidget);
+    expect(find.bySemanticsLabel('42 Volunteers'), findsOneWidget);
+    expect(find.bySemanticsLabel('1,240 Meals Distributed'), findsOneWidget);
+    expect(find.text('Ongoing · 20/30 volunteers'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tapVisible(tester, find.bySemanticsLabel('Manage Event'));
+    await settle(tester, 10);
+    expect(find.text('ONGOING NOW'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel(RegExp('^Not yet')));
+    await settle(tester, 3);
+    await tester.tap(find.bySemanticsLabel(RegExp('^Check in ')).first);
+    await settle(tester, 5);
+    expect(CoordinatorBoard.checkedInAt('Community Food Drive').length, 21);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.bySemanticsLabel('Done'));
+    await settle(tester, 10);
+    expect(find.text('Ongoing · 21/30 volunteers'), findsOneWidget);
+  });
+
+  testWidgets('Coordinator handles alerts and messages volunteers', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CoordinatorHomeScreen()));
+    await settle(tester, 25);
+
+    await tapVisible(tester, find.bySemanticsLabel('Approve all'));
+    await settle(tester, 6);
+    expect(find.text('4 volunteers approved and welcomed.'), findsOneWidget);
+    expect(CoordinatorBoard.pending.value, isEmpty);
+
+    await tapVisible(tester, find.bySemanticsLabel('Message Volunteers'));
+    await settle(tester, 10);
+    await tester.tap(find.bySemanticsLabel('Thank you for today!'));
+    await tester.pump();
+    await tester.tap(find.bySemanticsLabel('Send to 42 volunteers'));
+    await settle(tester, 10);
+    expect(CoordinatorBoard.broadcasts.value, ['Thank you for today!']);
+    expect(find.text('Message sent to 42 volunteers.'), findsOneWidget);
+
+    // The notice floats over the bottom bar until it's dismissed.
+    ScaffoldMessenger.of(tester.element(find.byType(CoordinatorHomeScreen)))
+        .removeCurrentSnackBar();
+    await settle(tester, 3);
+    await tapVisible(tester, find.bySemanticsLabel('Reports tab'));
+    await settle(tester, 20);
+    expect(find.byType(ImpactReportsScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator home fits a laptop', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CoordinatorHomeScreen()));
+    await settle(tester, 25);
+    expect(find.text('Volunteers'), findsWidgets);
+    expect(find.text('Coming Up This Week'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tapVisible(tester, find.text('Shelter Dinner Service').first);
+    await settle(tester, 10);
+    expect(find.byType(CoordinatorEventDetailsScreen), findsOneWidget);
+    expect(find.text('Prep checklist'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator tabs and tiles open their pages', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CoordinatorHomeScreen()));
+    await settle(tester, 25);
+
+    for (final (label, page) in [
+      ('Events tab', CoordinatorEventsScreen),
+      ('Volunteers tab', CoordinatorVolunteersScreen),
+      ('Reports tab', ImpactReportsScreen),
+      ('Profile tab', CoordinatorProfileScreen),
+    ]) {
+      await tapVisible(tester, find.bySemanticsLabel(label));
+      await settle(tester, 20);
+      expect(find.byType(page), findsOneWidget, reason: label);
+      expect(tester.takeException(), isNull, reason: label);
+    }
+    await tapVisible(tester, find.bySemanticsLabel('Home tab'));
+    await settle(tester, 20);
+    expect(find.byType(CoordinatorHomeScreen), findsOneWidget);
+    expect(find.byType(CoordinatorProfileScreen), findsNothing);
+
+    await tapVisible(tester, find.bySemanticsLabel('42 Volunteers'));
+    await settle(tester, 20);
+    expect(find.byType(CoordinatorVolunteersScreen), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await settle(tester, 15);
+
+    await tapVisible(tester, find.bySemanticsLabel('Beneficiaries'));
+    await settle(tester, 20);
+    expect(find.byType(BeneficiariesScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator creates an event', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CoordinatorEventsScreen()));
+    await settle(tester, 20);
+    expect(find.text('Community Food Drive'), findsOneWidget);
+    expect(find.text('20/30 volunteers'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Completed tab'));
+    await settle(tester, 6);
+    expect(find.text('Monsoon Relief Kits'), findsOneWidget);
+    expect(find.text('Community Food Drive'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('+  Create Event'));
+    await settle(tester, 20);
+    expect(find.byType(CreateEventScreen), findsOneWidget);
+
+    // Nothing filled in: Create asks for the details. (The page title is
+    // labelled Create Event too; the button comes last.)
+    await tester.tap(find.bySemanticsLabel('Create Event').last);
+    await settle(tester, 3);
+    expect(find.text('Give the event a name'), findsOneWidget);
+    expect(find.text('Pick a date and time'), findsWidgets);
+
+    await tester.enterText(find.byType(TextField).first, 'Diwali Food Drive');
+    await tester.tap(find.bySemanticsLabel('Category: Food Distribution'));
+    await settle(tester, 4);
+    await tester.tap(find.bySemanticsLabel('Community'));
+    await settle(tester, 4);
+    await tapVisible(tester, find.bySemanticsLabel(RegExp('^Date and time')));
+    await settle(tester, 5);
+    await tester.tap(find.text('OK'));
+    await settle(tester, 5);
+    await tester.tap(find.text('OK'));
+    await settle(tester, 5);
+    await tester.enterText(find.byType(TextField).at(1), 'Town Hall');
+    await tester.tap(find.bySemanticsLabel('Create Event').last);
+    await settle(tester, 20);
+
+    expect(find.byType(CreateEventScreen), findsNothing);
+    expect(CoordinatorBoard.eventNamed('Diwali Food Drive'), isNotNull);
+    expect(find.text('Diwali Food Drive'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator approves a pending volunteer', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(home: CoordinatorVolunteersScreen()),
+    );
+    await settle(tester, 20);
+    expect(find.text('Volunteers (32)'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel(RegExp('^Pending')));
+    await settle(tester, 6);
+    await tapVisible(tester, find.bySemanticsLabel('Sneha Das, Pending'));
+    await settle(tester, 10);
+    await tester.tap(find.bySemanticsLabel('Approve Sneha'));
+    await settle(tester, 5);
+    expect(CoordinatorBoard.isPending('Sneha Das'), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator adds a beneficiary and switches report period', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: BeneficiariesScreen()));
+    await settle(tester, 20);
+    expect(find.text('Kolkata Hope Shelter'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Add New tab'));
+    await settle(tester, 8);
+    await tester.enterText(find.byType(TextField).at(0), 'Hope Children Home');
+    await tester.enterText(find.byType(TextField).at(1), '5 Lake Road');
+    await tapVisible(tester, find.bySemanticsLabel('Save Beneficiary'));
+    await settle(tester, 10);
+    expect(
+      CoordinatorBoard.beneficiaries.value.first.name,
+      'Hope Children Home',
+    );
+    expect(find.text('Hope Children Home'), findsOneWidget);
+
+    await tester.pumpWidget(const MaterialApp(home: ImpactReportsScreen()));
+    await settle(tester, 25);
+    expect(find.bySemanticsLabel('1,240 Meals Distributed'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Period: This Month'));
+    await settle(tester, 4);
+    await tester.tap(find.bySemanticsLabel('This Year'));
+    await settle(tester, 20);
+    expect(find.bySemanticsLabel('5,840 Meals Distributed'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator profile pages work and Log Out signs out', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(home: CoordinatorProfileScreen()),
+    );
+    await settle(tester, 20);
+    expect(find.text('Agnibha Bhattacharya'), findsOneWidget);
+
+    for (final (label, page) in [
+      ('Organization Details', OrganizationDetailsScreen),
+      ('Team Management', TeamManagementScreen),
+      ('Settings', CoordinatorSettingsScreen),
+      ('Help & Support', CoordinatorHelpScreen),
+    ]) {
+      await tapVisible(tester, find.bySemanticsLabel(label));
+      await settle(tester, 15);
+      expect(find.byType(page), findsOneWidget, reason: label);
+      expect(tester.takeException(), isNull, reason: label);
+      if (page == CoordinatorSettingsScreen) {
+        await tapVisible(
+          tester,
+          find.bySemanticsLabel('Auto-approve new volunteers'),
+        );
+        await settle(tester, 3);
+        expect(CoordinatorBoard.settings.value.autoApprove, isTrue);
+      }
+      await tapVisible(tester, find.bySemanticsLabel('Back'));
+      await settle(tester, 10);
+    }
+
+    await tapVisible(tester, find.bySemanticsLabel('Log Out'));
+    await settle(tester, 6);
+    await tester.tap(find.bySemanticsLabel('Log Out button'));
+    await settle(tester, 20);
+    expect(find.byType(SignInScreen), findsOneWidget);
+  });
+
+  testWidgets('Coordinator pages fit a laptop', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    for (final page in const <Widget>[
+      CoordinatorEventsScreen(),
+      CreateEventScreen(),
+      CoordinatorVolunteersScreen(),
+      BeneficiariesScreen(),
+      ImpactReportsScreen(),
+      CoordinatorProfileScreen(),
+    ]) {
+      await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: page));
+      await settle(tester, 20);
+      expect(tester.takeException(), isNull, reason: '${page.runtimeType}');
+    }
+  });
+
+  testWidgets('Coordinator event details: checklist, complete and cancel', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: CoordinatorEventsScreen()));
+    await settle(tester, 20);
+    expect(find.bySemanticsLabel('5 Active'), findsOneWidget);
+
+    await tapVisible(tester, find.text('Urban Garden Setup'));
+    await settle(tester, 20);
+    expect(find.byType(CoordinatorEventDetailsScreen), findsOneWidget);
+    expect(find.text('Roles covered'), findsOneWidget);
+
+    await tapVisible(
+      tester,
+      find.bySemanticsLabel('Arrange supplies and transport'),
+    );
+    await settle(tester, 4);
+    expect(
+      CoordinatorBoard.tasksDone('Urban Garden Setup'),
+      contains('Arrange supplies and transport'),
+    );
+
+    await tapVisible(tester, find.bySemanticsLabel('Cancel Event'));
+    await settle(tester, 6);
+    await tester.tap(find.bySemanticsLabel('Cancel Event button'));
+    await settle(tester, 20);
+    expect(find.byType(CoordinatorEventDetailsScreen), findsNothing);
+    expect(CoordinatorBoard.eventNamed('Urban Garden Setup'), isNull);
+    expect(find.text('Urban Garden Setup'), findsNothing);
+
+    await tapVisible(tester, find.text('Education Support Drive'));
+    await settle(tester, 20);
+    await tapVisible(tester, find.bySemanticsLabel('Mark Complete'));
+    await settle(tester, 6);
+    await tester.tap(find.bySemanticsLabel('Complete button'));
+    await settle(tester, 10);
+    expect(
+      CoordinatorBoard.eventNamed('Education Support Drive')!.status,
+      EventStatus.completed,
+    );
+    expect(find.bySemanticsLabel('Send Thank-You'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Coordinator assigns a volunteer and keeps a note', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(home: CoordinatorVolunteersScreen()),
+    );
+    await settle(tester, 20);
+    expect(find.text('Most hours this month'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'Om Prakash');
+    await settle(tester, 5);
+    await tapVisible(tester, find.bySemanticsLabel(RegExp('^Om Prakash,')));
+    await settle(tester, 10);
+    final title = CoordinatorBoard.active
+        .firstWhere(
+          (managed) =>
+              !managed.roster.any((entry) => entry.name == 'Om Prakash') &&
+              managed.roster.length < managed.event.capacity,
+        )
+        .title;
+    await tapVisible(tester, find.bySemanticsLabel('Add to $title'));
+    await settle(tester, 4);
+    expect(
+      CoordinatorBoard.eventNamed(title)!.roster
+          .any((entry) => entry.name == 'Om Prakash'),
+      isTrue,
+    );
+    await tester.enterText(find.byType(TextField).last, 'Has a van');
+    await tester.tapAt(const Offset(195, 30));
+    await settle(tester, 10);
+    expect(CoordinatorBoard.notes.value['Om Prakash'], 'Has a van');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Beneficiary details and report extras', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: BeneficiariesScreen()));
+    await settle(tester, 20);
+    await tapVisible(tester, find.bySemanticsLabel('Night Shelter filter'));
+    await settle(tester, 6);
+    expect(find.text('Sunrise Home'), findsNothing);
+    await tapVisible(tester, find.text('City Night Shelter'));
+    await settle(tester, 20);
+    expect(find.byType(BeneficiaryDetailsScreen), findsOneWidget);
+    expect(find.text('Upcoming deliveries'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(
+      MaterialApp(key: UniqueKey(), home: const ImpactReportsScreen()),
+    );
+    await settle(tester, 25);
+    expect(find.text('+8% vs last month'), findsOneWidget);
+    expect(find.text('Meals by kind of event'), findsOneWidget);
+    await tapVisible(
+      tester,
+      find.bySemanticsLabel(RegExp('^Monsoon Relief Kits')),
+    );
+    await settle(tester, 20);
+    expect(find.byType(CoordinatorEventDetailsScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
