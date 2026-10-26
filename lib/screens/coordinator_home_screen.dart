@@ -11,6 +11,7 @@ import '../theme/app_fonts.dart';
 import '../widgets/app_nav.dart';
 import '../widgets/asset_photo.dart';
 import '../widgets/auth_widgets.dart';
+import '../widgets/coordinator_page.dart';
 import '../widgets/coordinator_widgets.dart';
 import '../widgets/onboarding_layout.dart';
 import '../widgets/page_scene.dart';
@@ -36,9 +37,11 @@ import 'coordinator/event_details_screen.dart';
 /// coordinator's bottom bar; laptops get the side rail, today's event and
 /// the week on the left, and alerts, actions and activity on the right.
 class CoordinatorHomeScreen extends StatefulWidget {
-  const CoordinatorHomeScreen({super.key, this.name = 'Agnibha'});
+  const CoordinatorHomeScreen({super.key, this.name});
 
-  final String name;
+  /// Overrides the signed-in coordinator's first name; leave unset to show
+  /// whoever is actually signed in.
+  final String? name;
 
   static const String routeName = 'coordinator-home';
 
@@ -51,6 +54,17 @@ class CoordinatorHomeScreen extends StatefulWidget {
 class _CoordinatorHomeScreenState extends State<CoordinatorHomeScreen>
     with TickerProviderStateMixin {
   final _photo = AssetPhoto(CoordinatorHomeScreen.photo);
+
+  /// The signed-in coordinator's first name, unless
+  /// [CoordinatorHomeScreen.name] overrides it.
+  String get _displayName {
+    if (widget.name != null) return widget.name!;
+    final me = CoordinatorBoard.team.value.firstWhere(
+      (member) => member.you,
+      orElse: () => CoordinatorBoard.team.value.first,
+    );
+    return me.name.split(' ').first;
+  }
 
   late final AnimationController _intro = AnimationController(
     vsync: this,
@@ -416,7 +430,7 @@ class _CoordinatorHomeScreenState extends State<CoordinatorHomeScreen>
         Expanded(
           child: Semantics(
             header: true,
-            label: '$_greeting ${widget.name}!',
+            label: '$_greeting $_displayName!',
             excludeSemantics: true,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,7 +450,7 @@ class _CoordinatorHomeScreenState extends State<CoordinatorHomeScreen>
                   child: Row(
                     children: [
                       Text(
-                        '${widget.name}!',
+                        '$_displayName!',
                         style: TextStyle(
                           fontFamily: AppFonts.display,
                           fontSize: large,
@@ -626,6 +640,41 @@ class _CoordinatorHomeScreenState extends State<CoordinatorHomeScreen>
     required int first,
     required bool wide,
   }) {
+    // A new real coordinator has no events yet — invite them to create
+    // one instead of failing to find "today's" event.
+    if (CoordinatorBoard.active.isEmpty) {
+      return [
+        RiseIn(
+          progress: _rise(first),
+          distance: 16 * s,
+          child: _sectionTitle('Today\'s Events', s),
+        ),
+        SizedBox(height: 16 * s),
+        RiseIn(
+          progress: _rise(first + 1),
+          distance: 18 * s,
+          child: CoordinatorCard(
+            scale: s,
+            child: Text(
+              'No events yet. Create your first event to start managing '
+              'volunteers and tracking meals here.',
+              style: TextStyle(fontSize: 15 * s, color: AppColors.bodyText),
+            ),
+          ),
+        ),
+        SizedBox(height: 18 * s),
+        RiseIn(
+          progress: _rise(first + 2),
+          distance: 18 * s,
+          child: PrimaryButton(
+            label: 'Create Event',
+            scale: s,
+            time: _ambient.value,
+            onPressed: _createEvent,
+          ),
+        ),
+      ];
+    }
     final today = _today;
     return [
       RiseIn(
@@ -732,7 +781,9 @@ class _CoordinatorHomeScreenState extends State<CoordinatorHomeScreen>
               (
                 Icons.how_to_reg_outlined,
                 'Check In\nVolunteers',
-                () => _manage(_today, s),
+                () => CoordinatorBoard.active.isEmpty
+                    ? showAuthNotice(context, 'Create an event first.')
+                    : _manage(_today, s),
               ),
               (Icons.add_circle_outline_rounded, 'Create\nEvent', _createEvent),
               (

@@ -944,7 +944,8 @@ class TopVolunteersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = scale;
-    final most = topVolunteers.first.$2;
+    // A real account has no recorded hours yet, so the list can be empty.
+    final most = topVolunteers.isEmpty ? 1 : topVolunteers.first.$2;
     return _Card(
       scale: s,
       child: Column(
@@ -957,6 +958,11 @@ class TopVolunteersCard extends StatelessWidget {
             scale: s,
           ),
           SizedBox(height: 12 * s),
+          if (topVolunteers.isEmpty)
+            Text(
+              'No volunteer hours recorded yet.',
+              style: TextStyle(fontSize: 14 * s, color: AppColors.bodyText),
+            ),
           for (final (i, (member, hours)) in topVolunteers.indexed)
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: hours / most),

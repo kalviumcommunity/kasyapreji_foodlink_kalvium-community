@@ -1,4 +1,4 @@
-# **PRD — Food Distribution Campaign Coordination Mobile App**
+**PRD — Food Distribution Campaign Coordination Mobile App**
 
  **Platform:** Mobile (Flutter \+ Dart)  
  **Backend:** Firebase Authentication \+ Cloud Firestore \+ Firebase Storage  

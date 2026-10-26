@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../auth/session_profile.dart';
+import '../data/app_session.dart';
 import '../data/community.dart';
 import '../data/my_events.dart';
 import '../data/volunteer_profile.dart';
@@ -125,6 +128,17 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
     if (sure != true || !mounted) return;
     HapticFeedback.mediumImpact();
+    // No-op for the demo login (no real Firebase user to sign out of).
+    // Guarded: signing out should never block reaching Sign In.
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {
+      // Ignore — there's nothing more useful to do with a sign-out
+      // failure than continue to Sign In anyway.
+    }
+    // Drop the real account's data from memory before anyone else signs in.
+    startDemoSession();
+    if (!mounted) return;
     Navigator.of(context)
         .pushAndRemoveUntil(softRoute(const SignInScreen()), (_) => false);
   }
@@ -539,7 +553,13 @@ class _ProfileScreenState extends State<ProfileScreen>
             SizedBox(width: 4 * s),
             Flexible(
               child: Text(
-                '${details.city} · Volunteering since Mar 2025',
+                // The "since" date is the sample volunteer's own; a real
+                // account shows its city (once set) or nothing invented.
+                AppSession.isDemo
+                    ? '${details.city} · Volunteering since Mar 2025'
+                    : details.city.isEmpty
+                    ? 'Add your city in Personal Information'
+                    : details.city,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 13.5 * s, color: AppColors.bodyText),

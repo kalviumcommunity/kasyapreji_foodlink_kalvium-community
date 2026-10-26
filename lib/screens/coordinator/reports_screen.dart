@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../data/app_session.dart';
 import '../../data/coordinator.dart';
 import '../../navigation/transitions.dart';
+import '../../services/campaign_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_fonts.dart';
 import '../../widgets/app_nav.dart';
@@ -34,9 +36,83 @@ class ImpactReportsScreen extends StatefulWidget {
 }
 
 class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
-  ReportPeriod _period = reportPeriods.first;
+  // The demo login shows the sample figures. A real account starts at
+  // real zeros — never the sample numbers, even if loading fails (offline,
+  // say) — and _loadRealReports() replaces them with what's in Firestore.
+  List<ReportPeriod> _periods = AppSession.isDemo
+      ? reportPeriods
+      : [
+          for (final period in reportPeriods)
+            ReportPeriod(
+              label: period.label,
+              meals: 0,
+              volunteers: 0,
+              communities: 0,
+              months: period.months,
+              previous: (0, 0, 0),
+              compareLabel: period.compareLabel,
+            ),
+        ];
+  List<(String, int)> _months = AppSession.isDemo
+      ? reportMonths
+      : [for (final (month, _) in reportMonths) (month, 0)];
+
+  late ReportPeriod _period = _periods.first;
   bool _choosing = false;
   int? _bar;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRealReports();
+  }
+
+  /// Computes real figures for every existing period (This Month, Last 3
+  /// Months, This Year) from actual `events`/`roster`/
+  /// `partnerOrganizations` records, plus the monthly bar-chart totals,
+  /// and swaps them in. An empty result (nothing recorded yet) still
+  /// comes back as real zeros, not an error — that's the correct,
+  /// honest "empty dataset" state, not a bug.
+  Future<void> _loadRealReports() async {
+    if (AppSession.isDemo) return;
+    try {
+      final comparisons = await Future.wait([
+        for (final period in reportPeriods)
+          CampaignService.computeReportComparison(months: period.months),
+      ]);
+      final months = await CampaignService.computeMonthlyMealTotals(
+        monthsBack: reportMonths.length,
+      );
+      if (!mounted) return;
+      final updated = [
+        for (var i = 0; i < reportPeriods.length; i++)
+          ReportPeriod(
+            label: reportPeriods[i].label,
+            meals: comparisons[i].current.meals,
+            volunteers: comparisons[i].current.volunteers,
+            communities: comparisons[i].current.communities,
+            months: reportPeriods[i].months,
+            previous: (
+              comparisons[i].previous.meals,
+              comparisons[i].previous.volunteers,
+              comparisons[i].previous.communities,
+            ),
+            compareLabel: reportPeriods[i].compareLabel,
+          ),
+      ];
+      setState(() {
+        _periods = updated;
+        _period = updated.firstWhere(
+          (p) => p.label == _period.label,
+          orElse: () => updated.first,
+        );
+        _months = months;
+      });
+    } catch (_) {
+      // Offline or unreachable: keep showing the sample figures rather
+      // than an error state, same as elsewhere in this app.
+    }
+  }
 
   void _download() {
     final csv = [
@@ -46,7 +122,7 @@ class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
       'Communities served,${_period.communities}',
       '',
       'Month,Meals',
-      for (final (month, meals) in reportMonths) '$month,$meals',
+      for (final (month, meals) in _months) '$month,$meals',
     ].join('\n');
     Clipboard.setData(ClipboardData(text: csv));
     HapticFeedback.mediumImpact();
@@ -70,7 +146,7 @@ class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
 
   /// Progress towards the year's meal goal, as a ring.
   Widget _goal(double s, double time) {
-    final year = reportPeriods.last.meals;
+    final year = _periods.last.meals;
     final share = year / coordinatorMealGoal;
     return CoordinatorCard(
       scale: s,
@@ -416,7 +492,11 @@ class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
                 label: label,
                 icon: icon,
                 delay: i,
-                change: ((value - previous) / previous * 100).round(),
+                // Nothing in the period before means there's no percentage
+                // to show (and dividing by it would be dividing by zero).
+                change: previous == 0
+                    ? (value == 0 ? 0 : null)
+                    : ((value - previous) / previous * 100).round(),
                 compare: _period.compareLabel,
                 scale: s,
                 onTap: () => _open(page, name),
@@ -511,7 +591,7 @@ class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
                   ),
                   child: Column(
                     children: [
-                      for (final period in reportPeriods)
+                      for (final period in _periods)
                         Semantics(
                           button: true,
                           selected: period == _period,
@@ -567,10 +647,10 @@ class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
 
   /// Meals by month, the period's months in green and the rest pale.
   Widget _chart(double s) {
-    final max = reportMonths.fold(0, (m, e) => e.$2 > m ? e.$2 : m);
-    final inPeriod = reportMonths.length - _period.months;
-    final selected = _bar ?? reportMonths.length - 1;
-    final (month, meals) = reportMonths[selected];
+    final max = _months.fold(0, (m, e) => e.$2 > m ? e.$2 : m);
+    final inPeriod = _months.length - _period.months;
+    final selected = _bar ?? _months.length - 1;
+    final (month, meals) = _months[selected];
     final chartHeight = 150 * s;
     return CoordinatorCard(
       scale: s,
@@ -613,7 +693,7 @@ class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final (i, (label, value)) in reportMonths.indexed)
+                for (final (i, (label, value)) in _months.indexed)
                   Expanded(
                     child: Semantics(
                       button: true,
@@ -637,7 +717,11 @@ class _ImpactReportsScreenState extends State<ImpactReportsScreen> {
                                   alignment: Alignment.bottomCenter,
                                   child: TweenAnimationBuilder<double>(
                                     key: ValueKey('${_period.label}/$i'),
-                                    tween: Tween(begin: 0, end: value / max),
+                                    // max is 0 when no meals are recorded.
+                                    tween: Tween(
+                                      begin: 0,
+                                      end: max == 0 ? 0 : value / max,
+                                    ),
                                     duration: Duration(
                                       milliseconds: 650 + i * 80,
                                     ),
@@ -714,8 +798,9 @@ class _StatCard extends StatefulWidget {
   final IconData icon;
   final int delay;
 
-  /// Percent change from the period before, and what it's compared with.
-  final int change;
+  /// Percent change from the period before, and what it's compared with;
+  /// `null` when the period before had nothing to compare against.
+  final int? change;
   final String compare;
   final double scale;
   final VoidCallback onTap;
@@ -794,35 +879,47 @@ class _StatCardState extends State<_StatCard> {
                           ),
                         ),
                         SizedBox(height: 4 * s),
-                        Row(
-                          children: [
-                            Icon(
-                              widget.change >= 0
-                                  ? Icons.trending_up_rounded
-                                  : Icons.trending_down_rounded,
-                              size: 15 * s,
-                              color: widget.change >= 0
-                                  ? AppColors.leafMid
-                                  : AppColors.badge,
-                            ),
-                            SizedBox(width: 4 * s),
-                            Flexible(
-                              child: Text(
-                                '${widget.change >= 0 ? '+' : ''}${widget.change}% '
-                                '${widget.compare}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12 * s,
-                                  fontWeight: FontWeight.w600,
-                                  color: widget.change >= 0
-                                      ? AppColors.leafMid
-                                      : AppColors.badge,
+                        if (widget.change case final change?)
+                          Row(
+                            children: [
+                              Icon(
+                                change >= 0
+                                    ? Icons.trending_up_rounded
+                                    : Icons.trending_down_rounded,
+                                size: 15 * s,
+                                color: change >= 0
+                                    ? AppColors.leafMid
+                                    : AppColors.badge,
+                              ),
+                              SizedBox(width: 4 * s),
+                              Flexible(
+                                child: Text(
+                                  '${change >= 0 ? '+' : ''}$change% '
+                                  '${widget.compare}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12 * s,
+                                    fontWeight: FontWeight.w600,
+                                    color: change >= 0
+                                        ? AppColors.leafMid
+                                        : AppColors.badge,
+                                  ),
                                 ),
                               ),
+                            ],
+                          )
+                        else
+                          Text(
+                            'Nothing earlier to compare with',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12 * s,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.fieldHint,
                             ),
-                          ],
-                        ),
+                          ),
                       ],
                     ),
                   ),

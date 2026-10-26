@@ -935,8 +935,12 @@ class _SummaryCard extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 6 * s),
-              _SpotsPill(left: spotsLeft, scale: s),
+              // A capacity of 0 means it was never set (older events), not
+              // "full" — say nothing rather than "Only 0 spots left".
+              if (event.capacity > 0) ...[
+                SizedBox(height: 6 * s),
+                _SpotsPill(left: spotsLeft, scale: s),
+              ],
             ],
           ),
         ),
@@ -1132,11 +1136,15 @@ class _EventPanel extends StatelessWidget {
                                     Text(text, style: white),
                                   ],
                                 ),
-                              _SpotsPill(
-                                left: math.max(0, event.capacity - event.going),
-                                scale: s,
-                                onDark: true,
-                              ),
+                              if (event.capacity > 0)
+                                _SpotsPill(
+                                  left: math.max(
+                                    0,
+                                    event.capacity - event.going,
+                                  ),
+                                  scale: s,
+                                  onDark: true,
+                                ),
                             ],
                           ),
                         ],

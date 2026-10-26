@@ -1,10 +1,13 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../auth/user_profile.dart';
 import '../navigation/transitions.dart';
+import '../services/real_data_loader.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/asset_photo.dart';
@@ -130,9 +133,49 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     showAuthNotice(context, "You're in the loop! Notifications are on.");
   }
 
-  void _later() {
+  /// Saves the chosen role (for a real account) and opens that role's home.
+  ///
+  /// Demo sign-ins have no Firebase user, so nothing is saved for them —
+  /// they just continue, same as before. A real account's chosen role is
+  /// saved as-is (either role may be chosen freely) and then locked.
+  Future<void> _later() async {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    final coordinator = widget.role == UserRole.coordinator;
+    final role = widget.role;
+    // Guarded: if Firebase somehow isn't ready, treat it as "not signed
+    // in" rather than crashing this screen outright.
+    User? user;
+    try {
+      user = FirebaseAuth.instance.currentUser;
+    } catch (_) {
+      user = null;
+    }
+    if (user != null) {
+      try {
+        // setRole is an update(), which fails with `not-found` if the
+        // profile document was never created (e.g. a write that failed at
+        // sign-up). Make sure it exists first so the role actually sticks.
+        await UserProfileService.createIfMissing(
+          uid: user.uid,
+          displayName:
+              user.displayName ?? (user.email ?? 'Volunteer').split('@').first,
+          email: user.email ?? '',
+        );
+        await UserProfileService.setRole(uid: user.uid, role: role.name);
+        debugPrint('Role saved: ${role.name} for ${user.uid}');
+      } on FirebaseException catch (e) {
+        // Shouldn't block getting into the app; the chosen role still
+        // applies for this session, and is retried on the next sign-in.
+        debugPrint('Saving role failed: ${e.code} — ${e.message}');
+      } catch (e) {
+        // Same here — the chosen role still applies for this session.
+        debugPrint('Saving role failed (unexpected): $e');
+      }
+      // A real account's home shows only its real data, loaded now that
+      // its role is known.
+      await loadRealData(uid: user.uid, role: role.name);
+    }
+    if (!mounted) return;
+    final coordinator = role == UserRole.coordinator;
     Navigator.of(context).push(
       softRoute(
         coordinator

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_session.dart';
 import 'join_options.dart';
 import 'sample_events.dart';
 
@@ -47,11 +48,18 @@ class PastVisit {
 }
 
 VolunteerEvent _categoryEvent(EventCategory category) =>
-    sampleEvents.firstWhere((event) => event.category == category);
+    demoEvents.firstWhere((event) => event.category == category);
 
-/// The volunteer's past events, newest first, until they come from the
-/// database. Their totals are the numbers on the volunteer home.
-final pastVisits = [
+/// The volunteer's past events, newest first. Their totals are the numbers
+/// on the volunteer home. The demo login gets the sample history; a real
+/// account has none yet — nothing in Firestore records attendance after
+/// an event, so there's no real history to show.
+List<PastVisit> get pastVisits =>
+    AppSession.isDemo ? demoPastVisits : const [];
+
+/// The sample past events, whoever is signed in — what the sample
+/// coordinator events are built from.
+final demoPastVisits = [
   _visit(
     title: 'Monsoon Relief Kits',
     day: ('Sun', 13, 'Sep'),
@@ -349,7 +357,7 @@ PastVisit _visit({
 /// slot, until plans come from the database.
 Map<String, JoinDetails> initialPlans() {
   JoinDetails plan(String title, String role, String slot) {
-    final event = sampleEvents.firstWhere((event) => event.title == title);
+    final event = demoEvents.firstWhere((event) => event.title == title);
     return JoinDetails(
       role: rolesFor(event).firstWhere((option) => option.name == role),
       slot: timeSlotsFor(event).firstWhere((option) => option.name == slot),

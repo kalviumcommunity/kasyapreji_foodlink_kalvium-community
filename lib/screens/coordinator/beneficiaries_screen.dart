@@ -52,6 +52,15 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
   bool _tried = false;
 
   @override
+  void initState() {
+    super.initState();
+    // One-time pull from Firestore so places saved from another session
+    // or device show up here too; the list still works instantly from
+    // the sample data either way.
+    CoordinatorBoard.loadPartnerOrganizationsFromFirestore();
+  }
+
+  @override
   void dispose() {
     for (final controller in [_search, _name, _address, _contact, _phone]) {
       controller.dispose();

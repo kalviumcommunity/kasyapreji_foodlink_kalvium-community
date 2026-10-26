@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../auth/session_profile.dart';
 import '../../data/coordinator.dart';
 import '../../navigation/transitions.dart';
 import '../../theme/app_colors.dart';
@@ -38,6 +40,17 @@ class CoordinatorProfileScreen extends StatelessWidget {
     );
     if (sure != true || !context.mounted) return;
     HapticFeedback.mediumImpact();
+    // No-op for the demo login (no real Firebase user to sign out of).
+    // Guarded: signing out should never block reaching Sign In.
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {
+      // Ignore — there's nothing more useful to do with a sign-out
+      // failure than continue to Sign In anyway.
+    }
+    // Drop the real account's data from memory before anyone else signs in.
+    startDemoSession();
+    if (!context.mounted) return;
     Navigator.of(context)
         .pushAndRemoveUntil(softRoute(const SignInScreen()), (_) => false);
   }
@@ -58,13 +71,23 @@ class CoordinatorProfileScreen extends StatelessWidget {
       body: (context, c) {
         final s = c.scale;
         final org = CoordinatorBoard.organisation.value;
+        // The signed-in coordinator is "you" on the team list; this is kept
+        // live so a real sign-in/sign-up replaces the sample name shown
+        // here, instead of this screen's own placeholder default.
+        final displayName = CoordinatorBoard.team.value
+            .firstWhere(
+              (member) => member.you,
+              orElse: () =>
+                  TeamMember(name: name, role: '', email: '', colors: const []),
+            )
+            .name;
         return [
           Center(
             child: _BigAvatar(scale: s, time: c.time),
           ),
           SizedBox(height: 14 * s),
           Text(
-            name,
+            displayName,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: AppFonts.display,
@@ -740,6 +763,11 @@ class TeamManagementScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // One-time pull from Firestore so invites sent from another session
+    // or device show up here too; cheap and harmless to call again on a
+    // later rebuild, since it only replaces local state once data
+    // actually comes back.
+    CoordinatorBoard.loadTeamFromFirestore();
     return CoordinatorPage(
       tab: CoordinatorTab.profile,
       title: 'Team Management',

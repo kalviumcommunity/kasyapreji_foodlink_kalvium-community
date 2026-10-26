@@ -2,10 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../auth/session_profile.dart';
+import '../auth/user_profile.dart';
 import '../navigation/transitions.dart';
+import '../services/real_data_loader.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/asset_photo.dart';
@@ -13,7 +17,9 @@ import '../widgets/foodlink_logo.dart';
 import '../widgets/leaf.dart';
 import '../widgets/light_particles.dart';
 import '../widgets/rise_in.dart';
+import 'coordinator_home_screen.dart';
 import 'onboarding_screen.dart';
+import 'volunteer_home_screen.dart';
 
 /// Splash / app bootstrap screen.
 ///
@@ -92,9 +98,53 @@ class _SplashScreenState extends State<SplashScreen>
     if (status != AnimationStatus.completed) return;
     _leaveTimer = Timer(widget.holdAfterIntro, () {
       if (!mounted) return;
-      Navigator.of(context)
-          .pushReplacement(softRoute(const OnboardingScreen()));
+      unawaited(_goNext());
     });
+  }
+
+  /// Where Splash leads: if a real account is still signed in from last
+  /// time (the demo login never sets this), and already has a saved role,
+  /// skip straight to that role's home — otherwise, Onboarding as usual.
+  Future<void> _goNext() async {
+    // Guarded: if Firebase somehow isn't ready, treat it as "not signed
+    // in" rather than crashing Splash outright.
+    User? user;
+    try {
+      user = FirebaseAuth.instance.currentUser;
+    } catch (_) {
+      user = null;
+    }
+    if (user != null) {
+      UserProfile? profile;
+      try {
+        profile = await UserProfileService.load(user.uid);
+      } catch (_) {
+        profile = null; // Offline or unreachable: fall through to normal.
+      }
+      final role = profile?.role;
+      if (role == 'coordinator' || role == 'volunteer') {
+        // Same as a fresh real sign-in: no sample data, only what's in
+        // Firestore, loaded before the home screen opens.
+        final email = profile?.email ?? user.email ?? '';
+        startRealSession(
+          email: email,
+          name: profile?.displayName ?? email.split('@').first,
+          phone: profile?.phone ?? '',
+        );
+        await loadRealData(uid: user.uid, role: role);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          softRoute(
+            role == 'coordinator'
+                ? const CoordinatorHomeScreen()
+                : const VolunteerHomeScreen(),
+          ),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(softRoute(const OnboardingScreen()));
   }
 
   @override

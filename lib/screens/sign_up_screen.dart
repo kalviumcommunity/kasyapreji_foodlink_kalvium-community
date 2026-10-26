@@ -1,8 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../auth/auth_errors.dart';
+import '../auth/session_profile.dart';
+import '../auth/user_profile.dart';
 import '../navigation/transitions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
@@ -111,10 +115,54 @@ class _SignUpScreenState extends State<SignUpScreen>
     }
 
     setState(() => _loading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    Navigator.of(context).push(softRoute(const RoleScreen(), slide: true));
+    try {
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+      await credential.user?.updateDisplayName(name);
+      // Creates users/{uid} with no role yet — Role Setup, next, sets it.
+      // Use the email exactly as Firebase Auth stored it (it lowercases
+      // it), not as typed — the security rules require the profile's
+      // email to match the auth token's, so "Asha@Gmail.com" as typed
+      // would otherwise be rejected.
+      await UserProfileService.createIfMissing(
+        uid: credential.user!.uid,
+        displayName: name,
+        email: credential.user!.email ?? email,
+        phone: _phone.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
+      // A brand-new real account starts empty: no sample events, history,
+      // profile details or anything else from the built-in sample data.
+      startRealSession(
+        email: credential.user!.email ?? email,
+        name: name,
+        phone: _phone.text.trim(),
+      );
+      // Shown so it's clear a real account was created, not a demo one.
+      showAuthNotice(context, 'Account created for $email');
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      Navigator.of(context).push(softRoute(const RoleScreen(), slide: true));
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      HapticFeedback.mediumImpact();
+      _shake.forward(from: 0);
+      if (e.code == 'email-already-in-use') {
+        setState(
+          () => _emailError = 'An account with that email already exists',
+        );
+      } else if (e.code == 'weak-password') {
+        setState(() => _passwordError = 'Please choose a stronger password');
+      } else {
+        showAuthNotice(context, friendlyAuthError(e));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      showAuthNotice(context, 'Something went wrong. Please try again.');
+    }
   }
 
   @override
@@ -306,9 +354,11 @@ class _SignUpScreenState extends State<SignUpScreen>
               action: 'Sign In',
               scale: s,
               // Swap rather than stack, so Back still leads to onboarding.
-              onTap: () =>
-                  Navigator.of(context)
-                      .pushReplacement(softRoute(const SignInScreen())),
+              // Carries over whatever email was already typed, so it
+              // doesn't have to be retyped on the Sign In screen.
+              onTap: () => Navigator.of(context).pushReplacement(
+                softRoute(SignInScreen(initialEmail: _email.text.trim())),
+              ),
             ),
           ),
         ],
