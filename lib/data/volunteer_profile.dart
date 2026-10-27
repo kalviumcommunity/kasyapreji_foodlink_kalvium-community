@@ -107,7 +107,35 @@ class VolunteerProfile {
   static final ValueNotifier<bool> availableForUrgent = ValueNotifier(true);
 
   @visibleForTesting
-  static void reset() {
+  static void reset() => useSampleData();
+
+  /// A real account's own profile: its real name, email and phone, and
+  /// nothing carried over from the sample volunteer — no sample city, bio,
+  /// emergency contact, interests, skills or availability.
+  static void useRealProfile({
+    required String name,
+    required String email,
+    required String phone,
+  }) {
+    details.value = ProfileDetails(
+      name: name,
+      email: email,
+      phone: phone,
+      city: '',
+      bio: '',
+      emergencyName: '',
+      emergencyPhone: '',
+    );
+    interests.value = {};
+    skills.value = {};
+    days.value = {};
+    timeOfDay.value = 'Any time';
+    settings.value = const ProfileSettings();
+    availableForUrgent.value = false;
+  }
+
+  /// Back to the sample volunteer — for the demo login.
+  static void useSampleData() {
     details.value = _initialDetails;
     interests.value = {'Food Drives', 'Community Kitchens', 'Gardening'};
     skills.value = {'Cooking', 'Lifting'};

@@ -1,6 +1,12 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../services/campaign_models.dart';
+import '../services/campaign_service.dart';
 import '../theme/app_colors.dart';
+import 'app_session.dart';
 import 'join_options.dart';
 import 'my_events.dart';
 import 'sample_events.dart';
@@ -161,10 +167,10 @@ List<RosterEntry> _roster(VolunteerEvent event, int count, int offset) {
 }
 
 VolunteerEvent _event(String title) =>
-    sampleEvents.firstWhere((event) => event.title == title);
+    demoEvents.firstWhere((event) => event.title == title);
 
 VolunteerEvent _past(String title) =>
-    pastVisits.firstWhere((visit) => visit.event.title == title).event;
+    demoPastVisits.firstWhere((visit) => visit.event.title == title).event;
 
 const _educationDrive = VolunteerEvent(
   title: 'Education Support Drive',
@@ -229,8 +235,13 @@ final managedEvents = [
 ];
 
 /// The coordinator's headline numbers on the home, as in the Figma.
-const coordinatorMealsDistributed = 1240;
-const coordinatorVolunteers = 42;
+/// The sample figures for the demo login; for a real account, the sum of
+/// its real events' meal counts and its number of real volunteers.
+int get coordinatorMealsDistributed => AppSession.isDemo
+    ? 1240
+    : CoordinatorBoard.events.value.fold(0, (sum, e) => sum + e.mealsSoFar);
+int get coordinatorVolunteers =>
+    AppSession.isDemo ? 42 : CoordinatorBoard.realVolunteers.length;
 
 /// One of the coordinator's volunteers.
 class VolunteerContact {
@@ -257,7 +268,13 @@ class VolunteerContact {
   ];
 }
 
-final volunteerContacts = [
+/// The coordinator's volunteers: the sample cast for the demo login, or
+/// for a real account, the real people who've joined its events in
+/// Firestore (see `loadRealData`).
+List<VolunteerContact> get volunteerContacts =>
+    AppSession.isDemo ? demoVolunteerContacts : CoordinatorBoard.realVolunteers;
+
+final demoVolunteerContacts = [
   for (final (i, name) in _names.indexed)
     VolunteerContact(
       name: name,
@@ -406,7 +423,31 @@ const reportMonths = [
 const coordinatorMealGoal = 8000;
 
 /// How the period's meals split across kinds of event.
-const mealsByCategory = [
+/// The sample split for the demo login; for a real account, each kind of
+/// event's share of the meals recorded on its real events (all zero until
+/// any meals are recorded).
+List<(String, double, IconData)> get mealsByCategory {
+  if (AppSession.isDemo) return _demoMealsByCategory;
+  final events = CoordinatorBoard.events.value;
+  final total = events.fold(0, (sum, e) => sum + e.mealsSoFar);
+  double share(EventCategory category) => total == 0
+      ? 0
+      : events
+                .where((e) => e.event.category == category)
+                .fold(0, (sum, e) => sum + e.mealsSoFar) /
+            total;
+  return [
+    (
+      'Food Distribution',
+      share(EventCategory.foodDrive),
+      Icons.volunteer_activism_rounded,
+    ),
+    ('Community', share(EventCategory.community), Icons.diversity_3_rounded),
+    ('Education', share(EventCategory.education), Icons.menu_book_rounded),
+  ];
+}
+
+const _demoMealsByCategory = [
   ('Food Distribution', 0.58, Icons.volunteer_activism_rounded),
   ('Community Kitchens', 0.27, Icons.soup_kitchen_outlined),
   ('Education', 0.15, Icons.menu_book_rounded),
@@ -640,7 +681,12 @@ class CoordinatorAlert {
   final String done;
 }
 
-const coordinatorAlerts = [
+/// What needs the coordinator's attention. The sample alerts are about
+/// sample volunteers and events, so a real account starts with none.
+List<CoordinatorAlert> get coordinatorAlerts =>
+    AppSession.isDemo ? _demoAlerts : const [];
+
+const _demoAlerts = [
   CoordinatorAlert(
     id: 'short',
     icon: Icons.group_add_rounded,
@@ -671,8 +717,12 @@ const coordinatorAlerts = [
 ];
 
 /// Recent things volunteers did on the coordinator's events: who, what,
-/// when, an icon, and which event.
-const coordinatorActivity = [
+/// when, an icon, and which event. For a real account, built from real
+/// roster entries (who joined, or asked to join, which event).
+List<(String, String, String, IconData, String)> get coordinatorActivity =>
+    AppSession.isDemo ? _demoActivity : CoordinatorBoard.realActivity;
+
+const _demoActivity = [
   (
     'Riya Sen',
     'checked in at Community Food Drive',
@@ -816,11 +866,30 @@ class CoordinatorBoard {
       if (managed.title != title) managed,
   ];
 
-  static void scheduleDelivery(String place, String when) =>
-      deliveries.value = {
-        ...deliveries.value,
-        place: [...?deliveries.value[place], when],
-      };
+  static void scheduleDelivery(String place, String when) {
+    deliveries.value = {
+      ...deliveries.value,
+      place: [...?deliveries.value[place], when],
+    };
+    // Best-effort persistence, same reasoning as addBeneficiary above.
+    bool signedIn;
+    try {
+      signedIn = FirebaseAuth.instance.currentUser != null;
+    } catch (_) {
+      signedIn = false;
+    }
+    if (!signedIn) return;
+    unawaited(
+      CampaignService.findPartnerOrganizationIdByName(place)
+          .then((id) {
+            if (id == null) return null;
+            return CampaignService.scheduleDelivery(orgId: id, whenLabel: when);
+          })
+          .catchError((_) {
+            // Already reflected locally; a future reload will retry.
+          }),
+    );
+  }
 
   /// Events that aren't finished yet.
   static List<ManagedEvent> get active => [
@@ -843,12 +912,32 @@ class CoordinatorBoard {
     );
     list.insert(firstDone < 0 ? list.length : firstDone, managed);
     events.value = list;
+    // Best-effort persistence, same reasoning as addBeneficiary above.
+    String? uid;
+    try {
+      uid = FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      uid = null;
+    }
+    if (uid == null) return;
+    unawaited(
+      CampaignService.createEvent(
+        event: managed.event,
+        status: managed.status.name,
+        createdBy: uid,
+      ).catchError((_) {
+        // Already reflected locally; nothing more to do about a
+        // background sync failure here.
+      }),
+    );
   }
 
   static bool isPending(String name) => pending.value.contains(name);
 
-  static void approve(String name) =>
-      pending.value = {...pending.value}..remove(name);
+  static void approve(String name) {
+    pending.value = {...pending.value}..remove(name);
+    _confirmRealPending((entry) => entry.name == name);
+  }
 
   static Map<String, Set<String>> _initialCheckIns() => {
     for (final managed in managedEvents)
@@ -873,19 +962,260 @@ class CoordinatorBoard {
   /// Handles an alert; approving all also clears the pending volunteers.
   static void handle(String alertId) {
     handledAlerts.value = {...handledAlerts.value, alertId};
-    if (alertId == 'approve') pending.value = {};
+    if (alertId == 'approve') {
+      pending.value = {};
+      _confirmRealPending((_) => true);
+    }
   }
 
   static void broadcast(String message) =>
       broadcasts.value = [...broadcasts.value, message];
 
-  static void addBeneficiary(Beneficiary beneficiary) =>
-      beneficiaries.value = [beneficiary, ...beneficiaries.value];
+  static void addBeneficiary(Beneficiary beneficiary) {
+    beneficiaries.value = [beneficiary, ...beneficiaries.value];
+    // Best-effort persistence: the screen already updated instantly
+    // above, so a slow or failed write here doesn't block the UI — it's
+    // only what makes the new place durable and visible on other
+    // devices. Skipped entirely for the demo login (no real Firebase
+    // user to attribute the record to) and guarded in case Firebase
+    // itself somehow isn't ready.
+    String? uid;
+    try {
+      uid = FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      uid = null;
+    }
+    if (uid == null) return;
+    final colorIndex = avatarColors.indexWhere(
+      (c) =>
+          c.length == beneficiary.colors.length &&
+          c[0] == beneficiary.colors[0],
+    );
+    unawaited(
+      CampaignService.addPartnerOrganization(
+        name: beneficiary.name,
+        type: beneficiary.type,
+        people: beneficiary.people,
+        address: beneficiary.address,
+        contact: beneficiary.contact,
+        phone: beneficiary.phone,
+        colorSeed: colorIndex < 0 ? 0 : colorIndex,
+        createdBy: uid,
+      ).catchError((_) {
+        // Already reflected locally; nothing more useful to do with a
+        // background sync failure than leave it for a future retry.
+      }),
+    );
+  }
 
-  static void invite(TeamMember member) => team.value = [...team.value, member];
+  static void invite(TeamMember member) {
+    team.value = [...team.value, member];
+    // Best-effort persistence, same reasoning as addBeneficiary above.
+    String? uid;
+    try {
+      uid = FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      uid = null;
+    }
+    if (uid == null) return;
+    final colorIndex = avatarColors.indexWhere(
+      (c) => c.length == member.colors.length && c[0] == member.colors[0],
+    );
+    unawaited(
+      CampaignService.inviteTeamMember(
+        name: member.name,
+        role: member.role,
+        email: member.email,
+        colorSeed: colorIndex < 0 ? 0 : colorIndex,
+      ).catchError((_) {
+        // Already reflected locally; nothing more to do about a
+        // background sync failure here.
+      }),
+    );
+  }
+
+  /// Pulls in the team members invited in Firestore, after the signed-in
+  /// coordinator's own "you" entry. The demo login keeps its sample team.
+  static Future<void> loadTeamFromFirestore() async {
+    if (AppSession.isDemo) return;
+    try {
+      final invited = await CampaignService.watchTeam().first;
+      final you = team.value.where((m) => m.you).toList();
+      team.value = [
+        ...you,
+        for (final record in invited)
+          TeamMember(
+            name: record.name,
+            role: record.role,
+            email: record.email,
+            colors: avatarColors[record.colorSeed % avatarColors.length],
+            invited: record.invited,
+          ),
+      ];
+    } catch (_) {
+      // Offline or unreachable: keep showing whatever's already there.
+    }
+  }
+
+  /// Pulls in the partner organizations saved in Firestore, so places added
+  /// from another session or device show up here too — and nothing from
+  /// the samples when there are none yet. The demo login keeps its sample
+  /// list.
+  static Future<void> loadPartnerOrganizationsFromFirestore() async {
+    if (AppSession.isDemo) return;
+    try {
+      final orgs = await CampaignService.watchPartnerOrganizations().first;
+      beneficiaries.value = [
+        for (final org in orgs)
+          Beneficiary(
+            name: org.name,
+            type: org.type,
+            people: org.people,
+            address: org.address,
+            contact: org.contact,
+            phone: org.phone,
+            mealsThisMonth: org.mealsThisMonth,
+            nextDelivery: org.nextDelivery.isEmpty
+                ? 'Not scheduled yet'
+                : org.nextDelivery,
+            colors: avatarColors[org.colorSeed % avatarColors.length],
+            isNew: org.isNew,
+          ),
+      ];
+    } catch (_) {
+      // Offline or unreachable: keep showing whatever's already there.
+    }
+  }
+
+  /// A real account's volunteers, activity and roster entries — filled by
+  /// `loadRealData`, empty for the demo login.
+  static List<VolunteerContact> realVolunteers = const [];
+  static List<(String, String, String, IconData, String)> realActivity =
+      const [];
+  static List<VolunteerParticipation> _realRoster = const [];
+
+  /// Replaces everything with a real account's starting point: no sample
+  /// events, volunteers, beneficiaries, team, alerts or activity — just
+  /// the signed-in coordinator as the team's "you". `loadRealData` then
+  /// fills in whatever is actually stored in Firestore.
+  static void clearForRealAccount({
+    required String name,
+    required String email,
+  }) {
+    events.value = [];
+    pending.value = {};
+    checkedIn.value = {};
+    handledAlerts.value = {};
+    broadcasts.value = [];
+    beneficiaries.value = [];
+    team.value = [
+      TeamMember(
+        name: name,
+        role: 'Coordinator',
+        email: email,
+        colors: AppColors.avatar,
+        you: true,
+      ),
+    ];
+    organisation.value = Organisation(
+      name: 'Your organisation',
+      type: 'Not set yet',
+      registration: 'Not set yet',
+      address: 'Not set yet',
+      email: email,
+      phone: 'Not set yet',
+      about: 'Add your organisation’s details in Organization Details.',
+    );
+    settings.value = const CoordinatorSettings();
+    doneTasks.value = {};
+    notes.value = {};
+    deliveries.value = {};
+    realVolunteers = const [];
+    realActivity = const [];
+    _realRoster = const [];
+  }
+
+  /// A real account's events and the real people on their rosters, from
+  /// Firestore. Pending roster entries become the Volunteers screen's
+  /// "Pending" list, so approving there confirms them for real.
+  static void useRealRoster({
+    required List<ManagedEvent> realEvents,
+    required List<VolunteerParticipation> roster,
+    required Map<String, String> eventTitles,
+  }) {
+    events.value = realEvents;
+    _realRoster = roster;
+    pending.value = {
+      for (final entry in roster)
+        if (entry.status == 'pending') entry.name,
+    };
+    final seen = <String>{};
+    realVolunteers = [
+      for (final entry in roster)
+        if (seen.add(entry.volunteerId))
+          VolunteerContact(
+            name: entry.name,
+            colors:
+                avatarColors[entry.volunteerId.hashCode.abs() %
+                    avatarColors.length],
+            phone: '—',
+            hours: 0,
+          ),
+    ];
+    final recent = [...roster]
+      ..sort(
+        (a, b) =>
+            (b.joinedAt ?? DateTime(0)).compareTo(a.joinedAt ?? DateTime(0)),
+      );
+    realActivity = [
+      for (final entry in recent.take(8))
+        (
+          entry.name,
+          entry.status == 'pending'
+              ? 'asked to join ${eventTitles[entry.eventId] ?? 'an event'}'
+              : 'joined ${eventTitles[entry.eventId] ?? 'an event'}',
+          _ago(entry.joinedAt),
+          entry.status == 'pending'
+              ? Icons.pending_actions_rounded
+              : Icons.person_add_alt_1_rounded,
+          eventTitles[entry.eventId] ?? '',
+        ),
+    ];
+  }
+
+  static String _ago(DateTime? time) {
+    if (time == null) return '';
+    final minutes = DateTime.now().difference(time).inMinutes;
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return '${minutes}m ago';
+    if (minutes < 60 * 24) return '${minutes ~/ 60}h ago';
+    return '${minutes ~/ (60 * 24)}d ago';
+  }
+
+  /// For a real account, confirms [name]'s pending roster entries in
+  /// Firestore (coordinator-only, enforced by firestore.rules). The local
+  /// "pending" set has already been updated by the caller.
+  static void _confirmRealPending(bool Function(VolunteerParticipation) which) {
+    if (AppSession.isDemo) return;
+    for (final entry in _realRoster) {
+      if (entry.status != 'pending' || !which(entry)) continue;
+      unawaited(
+        CampaignService.confirmRosterEntry(
+          eventId: entry.eventId,
+          volunteerId: entry.volunteerId,
+        ).catchError((_) {}),
+      );
+    }
+  }
 
   @visibleForTesting
-  static void reset() {
+  static void reset() => useSampleData();
+
+  /// Back to the sample coordinator — for the demo login.
+  static void useSampleData() {
+    realVolunteers = const [];
+    realActivity = const [];
+    _realRoster = const [];
     events.value = [...managedEvents];
     pending.value = {..._pending};
     checkedIn.value = _initialCheckIns();

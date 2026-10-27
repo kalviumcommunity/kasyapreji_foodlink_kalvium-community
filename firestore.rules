@@ -1,0 +1,232 @@
+rules_version = '2';
+service cloud.firestore {
+
+  function signedInAsOwner(userId) {
+    return request.auth != null && request.auth.uid == userId;
+  }
+
+  function roleIsUnchanged() {
+    return resource.data.get('role', null) == request.resource.data.get('role', null);
+  }
+
+  // Either role may be chosen freely at sign-up — a product decision: no
+  // coordinator approval step. What's still enforced is that it's one of
+  // the two real roles, and that it can only be chosen once.
+  function roleIsBeingSetForFirstTime() {
+    return resource.data.get('role', null) == null
+        && request.resource.data.get('role', null) in ['volunteer', 'coordinator'];
+  }
+
+  // The signed-in user's *stored* role — read from their own locked
+  // profile document, never trusted from anything the client sends on
+  // the request itself. This is what every campaign-side coordinator
+  // check below is built on.
+  function storedRole(database) {
+    return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', null);
+  }
+
+  function isCoordinator(database) {
+    return request.auth != null && storedRole(database) == 'coordinator';
+  }
+
+  // Whether the signed-in volunteer has an assignment at this site —
+  // the real, server-enforced gate on who may record distribution
+  // there. Relies on assignment IDs being `{siteId}_{volunteerId}`
+  // (see Assignment.idFor in campaign_models.dart) so this is a single
+  // exists() check, not a query rules can't express.
+  function hasAssignment(database, campaignId, siteId) {
+    return exists(
+      /databases/$(database)/documents/campaigns/$(campaignId)/assignments/$(siteId + '_' + request.auth.uid)
+    );
+  }
+
+  function siteExists(database, campaignId, siteId) {
+    return exists(/databases/$(database)/documents/campaigns/$(campaignId)/sites/$(siteId));
+  }
+
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      allow read: if signedInAsOwner(userId);
+
+      // A brand-new profile is created WITHOUT a role (role is chosen
+      // next, during Role Setup) — never with one baked in up front.
+      allow create: if signedInAsOwner(userId)
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.get('role', null) == null;
+
+      // Editing your own profile is fine. Changing `role` is only ever
+      // fine moving from "none yet" to volunteer or coordinator, for the
+      // FIRST time. Once role is set, it is locked: no further change is
+      // ever allowed from the app.
+      allow update: if signedInAsOwner(userId)
+                    && request.resource.data.email == resource.data.email
+                    && resource.data.get('createdAt', null) == request.resource.data.get('createdAt', null)
+                    && (roleIsUnchanged() || roleIsBeingSetForFirstTime());
+
+      allow delete: if false;
+    }
+
+    match /campaigns/{campaignId} {
+      // Any signed-in user can see the active campaign (matches the
+      // PRD: both roles see it on their dashboard).
+      allow read: if request.auth != null;
+
+      // Only a coordinator creates/manages a campaign, and only as its
+      // own recorded creator — `createdBy` can't be set to someone
+      // else, and can never be changed afterward.
+      allow create: if isCoordinator(database)
+                    && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isCoordinator(database)
+                    && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if false;
+
+      match /sites/{siteId} {
+        allow read: if request.auth != null;
+        allow create: if isCoordinator(database);
+
+        // A coordinator can change anything on a site. A volunteer who
+        // is actually assigned there can ONLY ever move `currentSupply`
+        // (and `updatedAt`) — never the name, address, capacity, or
+        // status — which is what the transactional distribution-event
+        // write in campaign_service.dart relies on.
+        allow update: if isCoordinator(database)
+                      || (request.auth != null
+                          && hasAssignment(database, campaignId, siteId)
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentSupply', 'updatedAt'])
+                          && request.resource.data.currentSupply is number
+                          && request.resource.data.currentSupply >= 0);
+        allow delete: if false;
+      }
+
+      match /assignments/{assignmentId} {
+        // A coordinator sees every assignment; a volunteer sees only
+        // their own.
+        allow read: if isCoordinator(database)
+                    || (request.auth != null && resource.data.volunteerId == request.auth.uid);
+
+        // Only a coordinator assigns volunteers, and the document ID
+        // must actually match its own siteId_volunteerId — a client
+        // can't create an assignment under a mismatched ID and have
+        // hasAssignment() or anything else trust it.
+        allow create: if isCoordinator(database)
+                      && assignmentId == request.resource.data.siteId + '_' + request.resource.data.volunteerId;
+        allow update: if isCoordinator(database);
+        allow delete: if false;
+      }
+
+      match /beneficiaries/{beneficiaryId} {
+        // Household-level PRD beneficiaries — coordinator-managed.
+        allow read: if request.auth != null;
+        allow create, update: if isCoordinator(database);
+        allow delete: if false;
+      }
+
+      match /distributionEvents/{eventId} {
+        allow read: if request.auth != null;
+
+        // The actual, server-enforced core of the whole distribution
+        // workflow: a volunteer can only record an event for themself,
+        // only at a site that exists, and only at a site they're
+        // genuinely assigned to — none of which the client gets to
+        // just assert.
+        allow create: if request.auth != null
+                      && request.resource.data.volunteerId == request.auth.uid
+                      && request.resource.data.quantity is number
+                      && request.resource.data.quantity > 0
+                      && siteExists(database, campaignId, request.resource.data.siteId)
+                      && hasAssignment(database, campaignId, request.resource.data.siteId);
+
+        // Append-only: corrections are an explicit coordinator edit,
+        // never a client delete (the PRD's own data design notes ask
+        // for exactly this).
+        allow update: if isCoordinator(database);
+        allow delete: if false;
+      }
+
+      match /reallocations/{reallocationId} {
+        allow read: if request.auth != null;
+
+        // Only a coordinator, only as their own recorded creator, only
+        // a positive quantity, and only between two sites that
+        // actually exist in this campaign.
+        allow create: if isCoordinator(database)
+                      && request.resource.data.createdBy == request.auth.uid
+                      && request.resource.data.quantity is number
+                      && request.resource.data.quantity > 0
+                      && siteExists(database, campaignId, request.resource.data.fromSiteId)
+                      && siteExists(database, campaignId, request.resource.data.toSiteId);
+
+        // Immutable once created.
+        allow update, delete: if false;
+      }
+
+      match /alerts/{alertId} {
+        allow read: if request.auth != null;
+        allow create, update: if isCoordinator(database);
+        allow delete: if false;
+      }
+
+      match /events/{eventId} {
+        allow read: if request.auth != null;
+        allow create, update: if isCoordinator(database);
+        allow delete: if false;
+
+        match /roster/{volunteerId} {
+          // A volunteer sees and manages only their OWN join record; a
+          // coordinator sees all of them. The document ID being the
+          // volunteer's own uid is what makes this a plain equality
+          // check instead of a query rules can't express.
+          allow read: if isCoordinator(database)
+                      || (request.auth != null && request.auth.uid == volunteerId);
+
+          // Joining an event is self-service — anyone signed in can
+          // create their own roster entry, but only their own.
+          allow create: if request.auth != null && request.auth.uid == volunteerId;
+
+          // Confirming a pending volunteer is a coordinator action.
+          allow update: if isCoordinator(database);
+
+          // Leaving an event is self-service too; a coordinator can
+          // also remove someone (e.g. a no-show).
+          allow delete: if request.auth != null
+                        && (request.auth.uid == volunteerId || isCoordinator(database));
+        }
+      }
+
+      match /team/{teamMemberId} {
+        // The existing Team Management screen's invited staff — same
+        // access shape as sites/beneficiaries/alerts/partnerOrganizations.
+        allow read: if request.auth != null;
+        allow create, update: if isCoordinator(database);
+        allow delete: if false;
+      }
+
+      match /partnerOrganizations/{orgId} {
+        // The existing Beneficiaries screens' shelters/community
+        // centres — a different concept from the household
+        // `beneficiaries` above; same access shape (coordinator-managed,
+        // readable by any signed-in user).
+        allow read: if request.auth != null;
+        allow create, update: if isCoordinator(database);
+        allow delete: if false;
+      }
+    }
+
+    // Collection-group queries across every event's roster at once (the
+    // Reports screen's volunteer counts, and the Volunteers screen's real
+    // directory) only match a rule written with the recursive `{path=**}`
+    // wildcard — the nested roster rule above doesn't apply to them. Only
+    // a coordinator may run one; volunteers still read just their own
+    // entry, through the nested rule.
+    match /{path=**}/roster/{volunteerId} {
+      allow read: if isCoordinator(database);
+    }
+
+    // Everything else stays closed until it's actually built and given
+    // its own rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

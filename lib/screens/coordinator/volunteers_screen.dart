@@ -100,21 +100,29 @@ class _CoordinatorVolunteersScreenState
             ),
           ),
           SizedBox(height: 12 * s),
-          SizedBox(
-            height: 150 * s,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              itemCount: 6,
-              separatorBuilder: (_, _) => SizedBox(width: 12 * s),
-              itemBuilder: (context, i) => _TopCard(
-                person: top[i],
-                rank: i + 1,
-                scale: s,
-                onTap: () => _openPerson(top[i], s),
+          // Up to six — a real account may have fewer volunteers (or none).
+          if (top.isEmpty)
+            Text(
+              'No volunteers yet. They appear here once they join one of '
+              'your events.',
+              style: TextStyle(fontSize: 14 * s, color: AppColors.bodyText),
+            )
+          else
+            SizedBox(
+              height: 150 * s,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
+                itemCount: top.length < 6 ? top.length : 6,
+                separatorBuilder: (_, _) => SizedBox(width: 12 * s),
+                itemBuilder: (context, i) => _TopCard(
+                  person: top[i],
+                  rank: i + 1,
+                  scale: s,
+                  onTap: () => _openPerson(top[i], s),
+                ),
               ),
             ),
-          ),
           SizedBox(height: 20 * s),
           CoordinatorSearch(
             controller: _search,

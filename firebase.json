@@ -1,0 +1,37 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    }
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "foodlink-ad39d",
+          "appId": "1:86125798576:android:2bde319ee925f63801c775",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "foodlink-ad39d",
+          "configurations": {
+            "android": "1:86125798576:android:2bde319ee925f63801c775",
+            "web": "1:86125798576:web:8b4498717851330e01c775"
+          }
+        }
+      }
+    }
+  }
+}

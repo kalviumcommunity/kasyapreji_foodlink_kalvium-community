@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'app_session.dart';
 
 /// The kinds of event volunteers can filter by on Explore, each with its own
 /// tag colours and icon.
@@ -90,6 +91,59 @@ class VolunteerEvent {
   final List<String> bring;
   final String organiser;
 
+  /// The event as plain, Firestore-ready data — what
+  /// `CampaignService.createEvent` stores, so a real event can be shown in
+  /// full on every device, not just the one that created it.
+  Map<String, Object?> toMap() => {
+    'title': title,
+    'when': when,
+    'place': place,
+    'category': category.name,
+    'photo': photo,
+    'date': date,
+    'hours': hours,
+    'address': address,
+    'about': about,
+    'going': going,
+    'capacity': capacity,
+    'impactValue': impact.$1,
+    'impactLabel': impact.$2,
+    'duration': duration,
+    'bring': bring,
+    'organiser': organiser,
+  };
+
+  /// Reads an event back from [toMap]'s shape. Anything missing gets a
+  /// plain default rather than failing — event documents saved before
+  /// this existed only stored a title.
+  factory VolunteerEvent.fromMap(Map<String, dynamic> data) {
+    String text(String key, [String fallback = '']) =>
+        data[key] as String? ?? fallback;
+    int number(String key) => (data[key] as num?)?.toInt() ?? 0;
+    return VolunteerEvent(
+      title: text('title', 'Untitled event'),
+      when: text('when'),
+      place: text('place'),
+      category:
+          EventCategory.values.asNameMap()[data['category']] ??
+          EventCategory.foodDrive,
+      photo: text('photo', 'assets/images/event_community_meal.jpg'),
+      date: text('date'),
+      hours: text('hours'),
+      address: text('address'),
+      about: text('about'),
+      going: number('going'),
+      capacity: number('capacity'),
+      impact: (text('impactValue', '0'), text('impactLabel', 'Meals')),
+      duration: text('duration'),
+      bring: [
+        for (final item in (data['bring'] as List?) ?? const [])
+          if (item is String) item,
+      ],
+      organiser: text('organiser'),
+    );
+  }
+
   /// Whether [query] appears in the title, place, date or category.
   bool matches(String query) {
     final q = query.trim().toLowerCase();
@@ -165,9 +219,20 @@ const _neighbourhoodShareDay = VolunteerEvent(
   organiser: 'Green Park Residents',
 );
 
-/// Sample events, until events come from the database. Explore lists them
-/// all, in this order.
-const sampleEvents = [
+/// The events Explore lists: the sample events for the demo login, or the
+/// real events from Firestore for a real account.
+List<VolunteerEvent> get sampleEvents =>
+    AppSession.isDemo ? demoEvents : AppSession.realEvents;
+
+/// The few events the volunteer home shows under "Upcoming Events": a
+/// handful of the samples for the demo login, or the first real ones.
+List<VolunteerEvent> get upcomingEvents => AppSession.isDemo
+    ? _demoUpcomingEvents
+    : AppSession.realEvents.take(3).toList();
+
+/// The fixed sample events, whoever is signed in — what other sample data
+/// (sample plans, sample coordinator events) is built from.
+const demoEvents = [
   _communityFoodDrive,
   VolunteerEvent(
     title: 'Urban Garden Setup',
@@ -385,8 +450,7 @@ const sampleEvents = [
   ),
 ];
 
-/// The few events the volunteer home shows under "Upcoming Events".
-const upcomingEvents = [
+const _demoUpcomingEvents = [
   _communityFoodDrive,
   _weekendMealPacking,
   _neighbourhoodShareDay,

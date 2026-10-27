@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'app_session.dart';
+import 'volunteer_profile.dart';
 
 /// Someone who posts in the community: a volunteer or an organisation.
 class CommunityMember {
@@ -34,8 +36,18 @@ class CommunityMember {
       .join();
 }
 
-/// The volunteer using the app, until accounts exist.
-const you = CommunityMember(
+/// The volunteer using the app: the sample volunteer for the demo login, or
+/// the signed-in account's own first name — so a real account's posts and
+/// comments never appear under the sample name.
+CommunityMember get you => AppSession.isDemo
+    ? _demoYou
+    : CommunityMember(
+        name: VolunteerProfile.details.value.name.split(' ').first,
+        about: 'Volunteer',
+        you: true,
+      );
+
+const _demoYou = CommunityMember(
   name: 'Agnibha',
   about: 'Volunteer · 12 events',
   you: true,
@@ -230,8 +242,21 @@ class CommunityFeed {
   }
 
   @visibleForTesting
-  static void reset() {
+  static void reset() => useSampleData();
+
+  /// Back to the sample feed — for the demo login.
+  static void useSampleData() {
     posts.value = [..._samplePosts];
+    liked.value = {};
+    saved.value = {};
+    _next = 0;
+  }
+
+  /// An empty feed for a real account. Community posts aren't stored in
+  /// Firestore yet, so a real account sees no sample posts by sample
+  /// people — only whatever it shares itself this session.
+  static void clearForRealAccount() {
+    posts.value = [];
     liked.value = {};
     saved.value = {};
     _next = 0;
@@ -515,9 +540,16 @@ const communityStories = [
   ),
 ];
 
-/// Meals shared through FoodLink each month this year (January to
-/// September).
-const monthlyMeals = [
+/// Meals shared through FoodLink each month: the sample year for the demo
+/// login, or real per-month totals from Firestore events for a real
+/// account (never empty — the impact chart always needs at least a month).
+List<(String, int)> get monthlyMeals {
+  if (AppSession.isDemo) return _demoMonthlyMeals;
+  final real = AppSession.realMonthlyMeals;
+  return real.isEmpty ? const [('This month', 0)] : real;
+}
+
+const _demoMonthlyMeals = [
   ('Jan', 3100),
   ('Feb', 3600),
   ('Mar', 4200),
@@ -533,12 +565,17 @@ const monthlyMeals = [
 const mealGoal = 60000;
 
 /// Volunteers with the most hours this month; the volunteer using the app
-/// is the one marked [CommunityMember.you].
-const topVolunteers = [
+/// is the one marked [CommunityMember.you]. Empty for a real account:
+/// nothing in Firestore records hours given yet, so there's no honest
+/// leaderboard to show.
+List<(CommunityMember, int)> get topVolunteers =>
+    AppSession.isDemo ? _demoTopVolunteers : const [];
+
+const _demoTopVolunteers = [
   (_priya, 28),
   (_riya, 24),
   (_ananya, 19),
   (_kabir, 16),
-  (you, 14),
+  (_demoYou, 14),
   (_arjun, 11),
 ];

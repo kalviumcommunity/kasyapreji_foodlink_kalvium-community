@@ -1,10 +1,17 @@
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
+import '../auth/auth_errors.dart';
 import '../auth/demo_account.dart';
+import '../auth/session_profile.dart';
+import '../auth/user_profile.dart';
 import '../navigation/transitions.dart';
+import '../services/real_data_loader.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/auth_field.dart';
@@ -13,8 +20,10 @@ import '../widgets/auth_widgets.dart';
 import '../widgets/google_logo.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/rise_in.dart';
+import 'coordinator_home_screen.dart';
 import 'role_screen.dart';
 import 'sign_up_screen.dart';
+import 'volunteer_home_screen.dart';
 
 /// Sign In: "Welcome Back".
 ///
@@ -22,11 +31,17 @@ import 'sign_up_screen.dart';
 /// card). Fields glow when focused, validate on submit and shake when
 /// something's wrong. "Sign Up" swaps to [SignUpScreen].
 ///
-/// Real authentication isn't connected yet (Firebase comes later). Until
-/// then the [DemoAccount] login (one tap fills it in) leads on to account
-/// setup ([RoleScreen]); any other valid-looking login is refused.
+/// The [DemoAccount] login (one tap fills it in) always leads to account
+/// setup ([RoleScreen]) with no Firebase call at all. Any other email/
+/// password goes to real Firebase Authentication: if that account already
+/// has a saved role, this skips straight to the matching home screen;
+/// otherwise it continues to Role Setup like a fresh sign-up would.
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  const SignInScreen({super.key, this.initialEmail});
+
+  /// Pre-fills the email field — used when arriving here right after
+  /// creating an account, so it doesn't have to be retyped.
+  final String? initialEmail;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -36,7 +51,12 @@ class _SignInScreenState extends State<SignInScreen>
     with SingleTickerProviderStateMixin {
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
-  final _email = TextEditingController();
+  /// `GoogleSignIn.instance.initialize()` only needs to run once per app
+  /// launch — guarded here rather than re-initializing on every tap,
+  /// matching the package's own recommended usage.
+  static bool _googleSignInInitialized = false;
+
+  late final _email = TextEditingController(text: widget.initialEmail);
   final _password = TextEditingController();
   final _passwordFocus = FocusNode();
   String? _emailError;
@@ -82,16 +102,169 @@ class _SignInScreenState extends State<SignInScreen>
     }
 
     setState(() => _loading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    if (!DemoAccount.matches(email, password)) {
-      setState(() => _passwordError = 'Incorrect email or password');
-      HapticFeedback.mediumImpact();
-      _shake.forward(from: 0);
+
+    // The demo login still works exactly as before, with no Firebase call,
+    // and always gets the built-in sample content — even if a real account
+    // was signed in earlier in this session.
+    if (DemoAccount.matches(email, password)) {
+      startDemoSession();
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Navigator.of(context).push(softRoute(const RoleScreen(), slide: true));
       return;
     }
-    Navigator.of(context).push(softRoute(const RoleScreen(), slide: true));
+
+    // Anything else goes to real Firebase Authentication.
+    try {
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+      await _afterRealSignIn(credential.user!, fallbackEmail: email);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      HapticFeedback.mediumImpact();
+      _shake.forward(from: 0);
+      const wrongCredentialCodes = {
+        'user-not-found',
+        'wrong-password',
+        'invalid-credential',
+      };
+      if (wrongCredentialCodes.contains(e.code)) {
+        setState(() => _passwordError = 'Incorrect email or password');
+      } else {
+        _notice(friendlyAuthError(e));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _notice('Something went wrong. Please try again.');
+    }
+  }
+
+  /// Shared by email sign-in and Google sign-in: loads (or self-heals) the
+  /// Firestore profile, reflects the real account in Profile/Team screens,
+  /// and either skips straight to the saved role's home screen or
+  /// continues to Role Setup, exactly as a fresh sign-up would.
+  Future<void> _afterRealSignIn(
+    User user, {
+    required String fallbackEmail,
+  }) async {
+    final uid = user.uid;
+    final email = user.email ?? fallbackEmail;
+
+    // A missing profile is unexpected (it should have been created at
+    // sign-up) but handled gracefully: self-heal it rather than leaving
+    // the account stuck.
+    var profile = await UserProfileService.load(uid);
+    profile ??= await () async {
+      await UserProfileService.createIfMissing(
+        uid: uid,
+        displayName: user.displayName ?? email.split('@').first,
+        email: email,
+      );
+      return UserProfileService.load(uid);
+    }();
+
+    debugPrint('Signed in ${user.uid}: profile role = ${profile?.role}');
+    // A real account sees only its own data: clear every sample list, then
+    // (if it already has a role) load what's actually in Firestore before
+    // its home screen opens.
+    startRealSession(
+      email: profile?.email ?? email,
+      name: profile?.displayName ?? email.split('@').first,
+      phone: profile?.phone ?? '',
+    );
+    final savedRole = profile?.role;
+    if (savedRole == 'coordinator' || savedRole == 'volunteer') {
+      await loadRealData(uid: uid, role: savedRole);
+    }
+    if (!mounted) return;
+    setState(() => _loading = false);
+    _notice('Signed in as $email');
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+
+    final role = profile?.role;
+    if (role == 'coordinator' || role == 'volunteer') {
+      // Role already chosen last time — skip Role Setup entirely.
+      Navigator.of(context).pushAndRemoveUntil(
+        softRoute(
+          role == 'coordinator'
+              ? const CoordinatorHomeScreen()
+              : const VolunteerHomeScreen(),
+        ),
+        (_) => false,
+      );
+    } else {
+      // No role saved yet — same as a fresh sign-up.
+      Navigator.of(context).push(softRoute(const RoleScreen(), slide: true));
+    }
+  }
+
+  /// "Continue with Google". Needs the Google provider enabled, and (for
+  /// Android) a registered SHA-1 fingerprint, in the Firebase Console —
+  /// see auth_errors.dart's `operation-not-allowed` / `invalid-credential`
+  /// handling for what shows if that hasn't been done yet. Android-only
+  /// for now — see the `kIsWeb` check just below for why.
+  Future<void> _signInWithGoogle() async {
+    if (_loading) return;
+    // The web build of `google_sign_in` has no popup-based authenticate()
+    // at all — Google's own Identity Services library only allows a
+    // sign-in through its own rendered button widget on web, not a
+    // programmatic call from a custom button like this one. This is a
+    // real platform limitation, not a configuration issue; the same
+    // code path works correctly on Android, where this app's "Continue
+    // with Google" button is what actually triggers it.
+    if (kIsWeb) {
+      _notice(
+        "Google sign-in isn't available in this web preview yet — it "
+        'works on Android. Please use email here instead.',
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      if (!_googleSignInInitialized) {
+        // No clientId needed here on Android: google-services.json
+        // already carries the matching web OAuth client FlutterFire
+        // needs (see android/app/google-services.json's client_type: 3
+        // entry) and the plugin reads it automatically. The `kIsWeb`
+        // branch above means this only ever runs on Android/iOS.
+        await GoogleSignIn.instance.initialize();
+        _googleSignInInitialized = true;
+      }
+      final account = await GoogleSignIn.instance.authenticate();
+      final idToken = account.authentication.idToken;
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        GoogleAuthProvider.credential(idToken: idToken),
+      );
+      await _afterRealSignIn(userCredential.user!, fallbackEmail: account.email);
+    } on GoogleSignInException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      debugPrint('Google sign-in failed: ${e.code} — ${e.description}');
+      // Android reports some setup and account problems as "canceled" too
+      // (the plugin can't tell them apart from the user backing out), so
+      // say something either way rather than appearing to do nothing.
+      _notice(
+        e.code == GoogleSignInExceptionCode.canceled
+            ? "Google sign-in didn't finish. If you didn't cancel it, try "
+                  'again, or use email.'
+            : "Google sign-in couldn't complete. Please try again, or use "
+                  'email.',
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      debugPrint('Google sign-in failed (Firebase): ${e.code} — ${e.message}');
+      _notice(friendlyAuthError(e));
+    } catch (e, stack) {
+      debugPrint('Google sign-in failed (unexpected): $e\n$stack');
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _notice('Something went wrong. Please try again.');
+    }
   }
 
   /// Fills in the demo login.
@@ -284,9 +457,7 @@ class _SignInScreenState extends State<SignInScreen>
                 SocialButton(
                   label: 'Continue with Google',
                   scale: s,
-                  onTap: () => _notice(
-                    "Google sign-in isn't connected yet. It will work once Firebase is set up.",
-                  ),
+                  onTap: _signInWithGoogle,
                   child: GoogleLogo(size: 24 * s),
                 ),
                 SocialButton(

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../data/my_events.dart';
 import '../data/sample_events.dart';
+import '../data/volunteer_profile.dart';
 import '../navigation/tab_navigation.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
@@ -19,8 +20,10 @@ import '../widgets/soft_backdrop.dart';
 import 'event_details_screen.dart';
 import 'explore_screen.dart';
 
-/// The volunteer's numbers, from the events they've been to.
-final _stats = [
+/// The volunteer's numbers, from the events they've been to. A getter, not
+/// a cached `final`: it must reflect whoever is signed in now (sample
+/// numbers for the demo login, real ones for a real account).
+List<(int, String, IconData)> get _stats => [
   (pastVisits.length, 'Events', Icons.event_available_rounded),
   (
     pastVisits.fold(0, (sum, visit) => sum + visit.hours),
@@ -44,12 +47,14 @@ final _stats = [
 /// side navigation rail and the events as a grid of photo cards.
 ///
 /// The Explore tab and "View All" open [ExploreScreen], each event opens its
-/// [EventDetailsScreen], and the other tabs open their sections. [name] is a
-/// sample value until accounts exist.
+/// [EventDetailsScreen], and the other tabs open their sections. [name]
+/// overrides the signed-in volunteer's first name (used by "Switch to
+/// Volunteer View" from the coordinator profile); leave it unset to show
+/// whoever is actually signed in.
 class VolunteerHomeScreen extends StatefulWidget {
-  const VolunteerHomeScreen({super.key, this.name = 'Agnibha'});
+  const VolunteerHomeScreen({super.key, this.name});
 
-  final String name;
+  final String? name;
 
   static const String routeName = 'volunteer-home';
 
@@ -63,6 +68,11 @@ class VolunteerHomeScreen extends StatefulWidget {
 class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     with TickerProviderStateMixin {
   final _photo = AssetPhoto(VolunteerHomeScreen.photo);
+
+  /// The signed-in volunteer's first name, unless [VolunteerHomeScreen.name]
+  /// overrides it.
+  String get _displayName =>
+      widget.name ?? VolunteerProfile.details.value.name.split(' ').first;
 
   late final AnimationController _intro = AnimationController(
     vsync: this,
@@ -423,7 +433,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
         : 0.0;
     return Semantics(
       header: true,
-      label: '$_greeting ${widget.name}!',
+      label: '$_greeting $_displayName!',
       excludeSemantics: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,7 +453,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             child: Row(
               children: [
                 Text(
-                  '${widget.name}!',
+                  '$_displayName!',
                   style: TextStyle(
                     fontFamily: AppFonts.display,
                     fontSize: large,
